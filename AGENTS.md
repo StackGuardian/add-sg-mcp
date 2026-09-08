@@ -23,7 +23,7 @@ A CLI that connects coding agents (Claude Code, Codex, Cursor, VS Code, Gemini C
 
 1. **Branch from up-to-date `main`** — `git checkout main && git pull`.
 2. **Implement the change** — keep the diff focused; match existing style and patterns. StackGuardian changes go in `src/sg/`.
-3. **Tests** — prefer **unit tests without mocks** and **e2e tests without mocks** (hand-rolled `test()` + `node:assert`, run with `tsx`). Every new test file must be added to the `test`/`test:unit`/`test:e2e` scripts in `package.json` — there is no glob.
+3. **Tests** — prefer **unit tests without mocks** and **e2e tests without mocks** (hand-rolled `test()` + `node:assert`, run with `tsx`). Every new test file must be added to the `UNIT` or `E2E` list in `tests/run.mjs` — there is no glob. The runner points `HOME` at a throwaway directory because upstream's installer tests write global agent configs in-process.
 4. **Typecheck** — `bun run typecheck`.
 5. **Tests** — `bun run test`.
 6. **Quality pass** — `bun run fmt`, then `bun run build`, `bun run typecheck`, `bun run test`.

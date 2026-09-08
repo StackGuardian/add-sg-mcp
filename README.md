@@ -114,7 +114,7 @@ bun run dev -- --help          # run from source
 bun run typecheck && bun run test
 ```
 
-Tests are plain `tsx` scripts with `node:assert` (no mocks; the login test spins up a real loopback server). See `AGENTS.md` for the workflow and `docs/superpowers/specs/` for the design.
+Tests are plain `tsx` scripts with `node:assert` (no mocks; the login test spins up a real loopback server), run by `tests/run.mjs` under a throwaway `HOME`. See `AGENTS.md` for the workflow and `docs/superpowers/specs/` for the design.
 
 This project is a fork of [neon-solutions/add-mcp](https://github.com/neon-solutions/add-mcp) (Apache-2.0); the agent config writers come from upstream unchanged. Passing a URL or package name as the first argument still installs any other MCP server the way `add-mcp` does.
 
