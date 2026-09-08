@@ -1,8 +1,8 @@
 {
-  "name": "add-mcp",
-  "version": "2.4.0",
-  "description": "Add MCP servers to your favorite coding agents with a single command.",
-  "author": "Andre Landgraf <andre@neon.tech>",
+  "name": "add-sg-mcp",
+  "version": "0.1.0",
+  "description": "Connect your coding agents to StackGuardian: installs the StackGuardian MCP server and skills into Claude Code, Codex, Cursor, VS Code, Gemini CLI, OpenCode and more with a single command.",
+  "author": "StackGuardian <support@stackguardian.io>",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/lib.js",
@@ -15,21 +15,19 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "add-mcp": "dist/index.js"
+    "add-sg-mcp": "dist/index.js"
   },
   "files": [
     "dist",
+    "skills",
     "README.md"
   ],
   "scripts": {
     "fmt": "prettier --write .",
     "build": "tsup src/index.ts src/lib.ts --format esm --dts --clean",
     "dev": "tsx src/index.ts",
-    "test": "tsx tests/source-parser.test.ts && tsx tests/agents.test.ts && tsx tests/config.test.ts && tsx tests/installer.test.ts && tsx tests/find.test.ts && tsx tests/package-arguments.test.ts && tsx tests/template.test.ts && tsx tests/reader.test.ts && tsx tests/formats-remove.test.ts && tsx tests/formats-utils.test.ts && tsx tests/opencode-config.test.ts && tsx tests/lib.test.ts && tsx tests/e2e/install.test.ts && tsx tests/e2e/cli.test.ts",
-    "test:unit": "tsx tests/source-parser.test.ts && tsx tests/agents.test.ts && tsx tests/config.test.ts && tsx tests/installer.test.ts && tsx tests/find.test.ts && tsx tests/package-arguments.test.ts && tsx tests/template.test.ts && tsx tests/reader.test.ts && tsx tests/formats-remove.test.ts && tsx tests/formats-utils.test.ts && tsx tests/opencode-config.test.ts && tsx tests/lib.test.ts",
-    "registry:sort": "tsx scripts/sort-registry.ts",
-    "registry:sync": "node scripts/sync-integrations-sh.mjs",
-    "registry:verify": "tsx scripts/verify-registry.ts",
+    "test": "tsx tests/source-parser.test.ts && tsx tests/agents.test.ts && tsx tests/config.test.ts && tsx tests/installer.test.ts && tsx tests/package-arguments.test.ts && tsx tests/template.test.ts && tsx tests/reader.test.ts && tsx tests/formats-remove.test.ts && tsx tests/formats-utils.test.ts && tsx tests/opencode-config.test.ts && tsx tests/lib.test.ts && tsx tests/sg-preset.test.ts && tsx tests/sg-credentials.test.ts && tsx tests/sg-auth.test.ts && tsx tests/sg-skills.test.ts && tsx tests/e2e/install.test.ts && tsx tests/e2e/cli.test.ts",
+    "test:unit": "tsx tests/source-parser.test.ts && tsx tests/agents.test.ts && tsx tests/config.test.ts && tsx tests/installer.test.ts && tsx tests/package-arguments.test.ts && tsx tests/template.test.ts && tsx tests/reader.test.ts && tsx tests/formats-remove.test.ts && tsx tests/formats-utils.test.ts && tsx tests/opencode-config.test.ts && tsx tests/lib.test.ts && tsx tests/sg-preset.test.ts && tsx tests/sg-credentials.test.ts && tsx tests/sg-auth.test.ts && tsx tests/sg-skills.test.ts",
     "test:e2e": "tsx tests/e2e/install.test.ts && tsx tests/e2e/cli.test.ts",
     "typecheck": "tsc --noEmit",
     "fallow": "fallow",
@@ -39,38 +37,24 @@
     "cli",
     "mcp",
     "model-context-protocol",
+    "stackguardian",
     "ai-agents",
-    "antigravity",
-    "cline",
     "claude-code",
-    "claude-desktop",
     "codex",
     "cursor",
-    "fx",
-    "github-copilot-cli",
-    "gemini-cli",
-    "goose",
-    "grok",
-    "grok-build",
-    "kilo-code",
-    "kimi-code",
-    "kiro",
-    "kiro-cli",
-    "mastracode",
-    "mcporter",
-    "opencode",
-    "pi",
     "vscode",
+    "gemini-cli",
+    "opencode",
     "windsurf",
-    "zed"
+    "skills"
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/neon-solutions/add-mcp.git"
+    "url": "git+https://github.com/StackGuardian/add-sg-mcp.git"
   },
-  "homepage": "https://github.com/neon-solutions/add-mcp#readme",
+  "homepage": "https://github.com/StackGuardian/add-sg-mcp#readme",
   "bugs": {
-    "url": "https://github.com/neon-solutions/add-mcp/issues"
+    "url": "https://github.com/StackGuardian/add-sg-mcp/issues"
   },
   "dependencies": {
     "@clack/prompts": "^0.9.1",

@@ -22,9 +22,6 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Verify registry entries
-        run: bun run registry:verify
-
       - name: Type check
         run: bun run typecheck
 

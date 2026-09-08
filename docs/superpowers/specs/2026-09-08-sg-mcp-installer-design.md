@@ -32,16 +32,16 @@ Non-goals (this iteration):
 
 ## 2. Decisions
 
-| # | Decision | Why |
-|---|---|---|
-| D1 | The credential is the user's **per-org API key** (`sgu_…`), obtained with `POST /api/v1/orgs/<org>/api_token/` `{regenerate:false}`, sent as `Authorization: apikey <key>`. | The gateway authorizer accepts it on the MCP routes (auth `src/app.py:851-865`, `:1153-1179`): the org comes from the URL path, the principal and roles are the user's own. It is long-lived, so static agent configs keep working. The OAuth ID token expires in 60 min and would need a refresh process in every agent. This is also what the dashboard's own "MCP install" snippet already uses (`ApiKeyManagement.tsx:27`). |
-| D2 | Login and org selection happen on a **new dashboard page** `/orchestrator/cli-connect`, which redirects to a **loopback callback** on the CLI. | The user asked for the dashboard to drive login + org selection. The dashboard already preserves deep links through login (`App.jsx` `handleUser`, `utils/redirect/*`) and has the org list + `OrgApiKey` service used by `TerraformLogin`. The loopback redirect is the `gh auth login` model. |
-| D3 | Default scope is **user-level** (global). Project scope needs `--project`. | A credential must not be written into a repo's `.mcp.json` / `.cursor/mcp.json` by default. Upstream defaults to project scope; we invert it. |
-| D4 | Reuse upstream's agent table, config writers and installer **unchanged**; put all StackGuardian logic in `src/sg/*`. | Upstream adds agents every minor release; keeping `agents.ts`, `installer.ts`, `formats/*` byte-identical keeps `git merge upstream/main` cheap. |
-| D5 | Skills ship **inside the npm package** (`skills/`), are installed to the cross-agent canonical directory (`~/.agents/skills/<name>` or `.agents/skills/<name>`) and **symlinked** into each agent's native skills directory (copy fallback). | Matches the `.agents/skills` convention the Agent Skills spec recommends and the layout the `skills` CLI already creates on developer machines. |
-| D6 | Skill names are prefixed `sg-` (`sg-create-workflow`, `sg-update-workflow`, `sg-upgrade-workflow`). | Namespacing avoids collisions with generic "create-workflow" skills; `name` must equal the directory name. |
-| D7 | The MCP server entry is named `stackguardian` and points at `https://<api-host>/api/v1/orgs/<org>/mcp/`. | `/mcp/` with trailing slash is the gateway resource that avoids a redirect (`lakehouse_mcp/path_prefix.py`). One org per entry; `--name` allows a second org side by side. |
-| D8 | The dashboard page passes `api_base` back to the CLI, and the CLI accepts only `https` hosts ending in `.stackguardian.io`. | `app.stackguardian.io` and `us.stackguardian.io` are the same bundle; the API host is chosen at runtime from the browser hostname (`authUtils.getApiEndpointForCurrentRegion`). The allow-list closes the obvious redirect-injection hole. |
+| #   | Decision                                                                                                                                                                                                                                     | Why                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | The credential is the user's **per-org API key** (`sgu_…`), obtained with `POST /api/v1/orgs/<org>/api_token/` `{regenerate:false}`, sent as `Authorization: apikey <key>`.                                                                  | The gateway authorizer accepts it on the MCP routes (auth `src/app.py:851-865`, `:1153-1179`): the org comes from the URL path, the principal and roles are the user's own. It is long-lived, so static agent configs keep working. The OAuth ID token expires in 60 min and would need a refresh process in every agent. This is also what the dashboard's own "MCP install" snippet already uses (`ApiKeyManagement.tsx:27`). |
+| D2  | Login and org selection happen on a **new dashboard page** `/orchestrator/cli-connect`, which redirects to a **loopback callback** on the CLI.                                                                                               | The user asked for the dashboard to drive login + org selection. The dashboard already preserves deep links through login (`App.jsx` `handleUser`, `utils/redirect/*`) and has the org list + `OrgApiKey` service used by `TerraformLogin`. The loopback redirect is the `gh auth login` model.                                                                                                                                 |
+| D3  | Default scope is **user-level** (global). Project scope needs `--project`.                                                                                                                                                                   | A credential must not be written into a repo's `.mcp.json` / `.cursor/mcp.json` by default. Upstream defaults to project scope; we invert it.                                                                                                                                                                                                                                                                                   |
+| D4  | Reuse upstream's agent table, config writers and installer **unchanged**; put all StackGuardian logic in `src/sg/*`.                                                                                                                         | Upstream adds agents every minor release; keeping `agents.ts`, `installer.ts`, `formats/*` byte-identical keeps `git merge upstream/main` cheap.                                                                                                                                                                                                                                                                                |
+| D5  | Skills ship **inside the npm package** (`skills/`), are installed to the cross-agent canonical directory (`~/.agents/skills/<name>` or `.agents/skills/<name>`) and **symlinked** into each agent's native skills directory (copy fallback). | Matches the `.agents/skills` convention the Agent Skills spec recommends and the layout the `skills` CLI already creates on developer machines.                                                                                                                                                                                                                                                                                 |
+| D6  | Skill names are prefixed `sg-` (`sg-create-workflow`, `sg-update-workflow`, `sg-upgrade-workflow`).                                                                                                                                          | Namespacing avoids collisions with generic "create-workflow" skills; `name` must equal the directory name.                                                                                                                                                                                                                                                                                                                      |
+| D7  | The MCP server entry is named `stackguardian` and points at `https://<api-host>/api/v1/orgs/<org>/mcp/`.                                                                                                                                     | `/mcp/` with trailing slash is the gateway resource that avoids a redirect (`lakehouse_mcp/path_prefix.py`). One org per entry; `--name` allows a second org side by side.                                                                                                                                                                                                                                                      |
+| D8  | The dashboard page passes `api_base` back to the CLI, and the CLI accepts only `https` hosts ending in `.stackguardian.io`.                                                                                                                  | `app.stackguardian.io` and `us.stackguardian.io` are the same bundle; the API host is chosen at runtime from the browser hostname (`authUtils.getApiEndpointForCurrentRegion`). The allow-list closes the obvious redirect-injection hole.                                                                                                                                                                                      |
 
 ## 3. Architecture
 
@@ -80,16 +80,16 @@ npx add-sg-mcp [options]        Connect: login (if needed) → install server �
 
 Auth options (default command and `login`):
 
-| Option | Meaning |
-|---|---|
-| `--region <eu\|us>` | Production region → dashboard `app.` / `us.stackguardian.io`. Prompted when omitted and interactive. |
-| `--env <prod\|qa>` | `qa` → `dash.qa.stackguardian.io` / `testapi.qa…`. Default `prod`. |
-| `--dashboard-url <url>` | Any other dashboard (nonprod envs, local dev). Must be http(s). |
-| `--org <org>` | Pre-select the organization (the page still shows it; with `--token` it is required). |
-| `--token <sgu_key>` | Headless: skip the browser. Requires `--org` and `--api-base` (or `--region`/`--env`). |
-| `--api-base <url>` | API base for `--token`, e.g. `https://api.app.stackguardian.io/api/v1`. |
-| `--no-browser` | Print the URL instead of opening a browser; still waits for the callback. |
-| `--timeout <s>` | Callback wait, default 300. |
+| Option                  | Meaning                                                                                              |
+| ----------------------- | ---------------------------------------------------------------------------------------------------- |
+| `--region <eu\|us>`     | Production region → dashboard `app.` / `us.stackguardian.io`. Prompted when omitted and interactive. |
+| `--env <prod\|qa>`      | `qa` → `dash.qa.stackguardian.io` / `testapi.qa…`. Default `prod`.                                   |
+| `--dashboard-url <url>` | Any other dashboard (nonprod envs, local dev). Must be http(s).                                      |
+| `--org <org>`           | Pre-select the organization (the page still shows it; with `--token` it is required).                |
+| `--token <sgu_key>`     | Headless: skip the browser. Requires `--org` and `--api-base` (or `--region`/`--env`).               |
+| `--api-base <url>`      | API base for `--token`, e.g. `https://api.app.stackguardian.io/api/v1`.                              |
+| `--no-browser`          | Print the URL instead of opening a browser; still waits for the callback.                            |
+| `--timeout <s>`         | Callback wait, default 300.                                                                          |
 
 Environment variables `SG_API_KEY`, `SG_ORG`, `SG_API_BASE` are read as
 fallbacks for `--token`, `--org`, `--api-base` (CI use).
@@ -125,13 +125,13 @@ CLI                                  Browser / dashboard                        
 
 Callback contract (`GET /callback`):
 
-| Param | Rule |
-|---|---|
-| `state` | must equal the CLI's nonce; otherwise `400`, keep waiting |
-| `org` | `^[A-Za-z0-9_-]{1,128}$` (org names are Django slugs) |
-| `api_key` | non-empty, `^[A-Za-z0-9_.-]{16,512}$` |
+| Param      | Rule                                                                               |
+| ---------- | ---------------------------------------------------------------------------------- |
+| `state`    | must equal the CLI's nonce; otherwise `400`, keep waiting                          |
+| `org`      | `^[A-Za-z0-9_-]{1,128}$` (org names are Django slugs)                              |
+| `api_key`  | non-empty, `^[A-Za-z0-9_.-]{16,512}$`                                              |
 | `api_base` | `https://` + hostname ending `.stackguardian.io`; the CLI normalises to `…/api/v1` |
-| `error` | `access_denied` → the CLI exits 1 with "Cancelled in the browser" |
+| `error`    | `access_denied` → the CLI exits 1 with "Cancelled in the browser"                  |
 
 Only the first valid callback is accepted; the server closes after it.
 Timeout → exit 1 with the `--token` hint. The browser is opened with
@@ -169,10 +169,16 @@ The key is held in component state only; never in storage or logs.
 `~/.config/add-sg-mcp/`), directory `0700`, file `0600`:
 
 ```json
-{ "version": 1,
-  "current": { "apiBase": "https://api.app.stackguardian.io/api/v1",
-               "dashboardUrl": "https://app.stackguardian.io",
-               "org": "demo-org", "apiKey": "sgu_…", "obtainedAt": "2026-09-08T12:00:00Z" } }
+{
+  "version": 1,
+  "current": {
+    "apiBase": "https://api.app.stackguardian.io/api/v1",
+    "dashboardUrl": "https://app.stackguardian.io",
+    "org": "demo-org",
+    "apiKey": "sgu_…",
+    "obtainedAt": "2026-09-08T12:00:00Z"
+  }
+}
 ```
 
 `status` prints the key masked (`sgu_…last4`). `logout` deletes the file.
@@ -209,31 +215,31 @@ with the `sg-` prefix and cross-references updated.
 
 Install (per selected agent, same scope as the server):
 
-| Scope | Canonical copy | Agent link |
-|---|---|---|
-| global | `~/.agents/skills/<name>/` | `<agent global skills dir>/<name>` → symlink (relative) |
-| project | `<cwd>/.agents/skills/<name>/` | `<cwd>/<agent project skills dir>/<name>` → symlink |
+| Scope   | Canonical copy                 | Agent link                                              |
+| ------- | ------------------------------ | ------------------------------------------------------- |
+| global  | `~/.agents/skills/<name>/`     | `<agent global skills dir>/<name>` → symlink (relative) |
+| project | `<cwd>/.agents/skills/<name>/` | `<cwd>/<agent project skills dir>/<name>` → symlink     |
 
 Agent skills directories (from the `skills` CLI table, verified on this
 machine for Claude Code, Codex, Gemini, OpenCode, Copilot, Cursor):
 
-| Agent | global | project |
-|---|---|---|
-| claude-code | `~/.claude/skills` | `.claude/skills` |
-| codex | `~/.codex/skills` | `.agents/skills` (canonical) |
-| cursor | `~/.cursor/skills` | `.agents/skills` |
-| gemini-cli | `~/.gemini/skills` | `.agents/skills` |
-| vscode, github-copilot-cli | `~/.copilot/skills` | `.agents/skills` |
-| opencode | `~/.config/opencode/skills` | `.agents/skills` |
-| kilo-code | `~/.kilo/skills` | `.agents/skills` |
-| cline, cline-cli, kimi-code, zed | `~/.agents/skills` (canonical) | `.agents/skills` |
-| windsurf | `~/.codeium/windsurf/skills` | `.windsurf/skills` |
-| antigravity | `~/.gemini/antigravity/skills` | `.agents/skills` |
-| goose | `~/.config/goose/skills` | `.goose/skills` |
-| grok-build | `~/.grok/skills` | `.grok/skills` |
-| kiro-cli | `~/.kiro/skills` | `.kiro/skills` |
-| pi | `~/.pi/agent/skills` | `.pi/skills` |
-| mastracode, mcporter | none (skipped with a note) | none |
+| Agent                            | global                         | project                      |
+| -------------------------------- | ------------------------------ | ---------------------------- |
+| claude-code                      | `~/.claude/skills`             | `.claude/skills`             |
+| codex                            | `~/.codex/skills`              | `.agents/skills` (canonical) |
+| cursor                           | `~/.cursor/skills`             | `.agents/skills`             |
+| gemini-cli                       | `~/.gemini/skills`             | `.agents/skills`             |
+| vscode, github-copilot-cli       | `~/.copilot/skills`            | `.agents/skills`             |
+| opencode                         | `~/.config/opencode/skills`    | `.agents/skills`             |
+| kilo-code                        | `~/.kilo/skills`               | `.agents/skills`             |
+| cline, cline-cli, kimi-code, zed | `~/.agents/skills` (canonical) | `.agents/skills`             |
+| windsurf                         | `~/.codeium/windsurf/skills`   | `.windsurf/skills`           |
+| antigravity                      | `~/.gemini/antigravity/skills` | `.agents/skills`             |
+| goose                            | `~/.config/goose/skills`       | `.goose/skills`              |
+| grok-build                       | `~/.grok/skills`               | `.grok/skills`               |
+| kiro-cli                         | `~/.kiro/skills`               | `.kiro/skills`               |
+| pi                               | `~/.pi/agent/skills`           | `.pi/skills`                 |
+| mastracode, mcporter             | none (skipped with a note)     | none                         |
 
 When the agent directory equals the canonical one, only the copy is made.
 Symlink failure (Windows without privileges, `EPERM`) falls back to a
@@ -244,20 +250,20 @@ records what was written so removal never touches foreign skills.
 
 ## 9. Error handling
 
-| Where | Condition | Behaviour |
-|---|---|---|
-| CLI | browser cannot be opened | print the URL, keep waiting |
-| CLI | no callback within timeout | exit 1: "No response from the browser. Run again, or use --token" |
-| CLI | state mismatch / bad params | HTTP 400 to the browser, keep waiting |
-| CLI | `api_base` not allow-listed | HTTP 400, keep waiting, print warning |
-| CLI | `error=access_denied` | exit 1: "Cancelled in the browser" |
-| CLI | credentials file unwritable | exit 1 with the path |
-| CLI | agent write failure | upstream per-agent error report, exit 1 |
-| CLI | skills link failure | fall back to copy; report per agent |
-| Page | invalid `port`/`state` | error Alert, no key fetched |
-| Page | `OrgApiKey` error | notification + inline error; nothing sent |
-| Page | zero orgs | Alert linking to onboarding |
-| Page | loopback unreachable | browser error page; Back shows the fallback panel |
+| Where | Condition                   | Behaviour                                                         |
+| ----- | --------------------------- | ----------------------------------------------------------------- |
+| CLI   | browser cannot be opened    | print the URL, keep waiting                                       |
+| CLI   | no callback within timeout  | exit 1: "No response from the browser. Run again, or use --token" |
+| CLI   | state mismatch / bad params | HTTP 400 to the browser, keep waiting                             |
+| CLI   | `api_base` not allow-listed | HTTP 400, keep waiting, print warning                             |
+| CLI   | `error=access_denied`       | exit 1: "Cancelled in the browser"                                |
+| CLI   | credentials file unwritable | exit 1 with the path                                              |
+| CLI   | agent write failure         | upstream per-agent error report, exit 1                           |
+| CLI   | skills link failure         | fall back to copy; report per agent                               |
+| Page  | invalid `port`/`state`      | error Alert, no key fetched                                       |
+| Page  | `OrgApiKey` error           | notification + inline error; nothing sent                         |
+| Page  | zero orgs                   | Alert linking to onboarding                                       |
+| Page  | loopback unreachable        | browser error page; Back shows the fallback panel                 |
 
 Nothing logs the key: the CLI masks it in `status`, and the callback URL is
 only ever parsed, never printed.

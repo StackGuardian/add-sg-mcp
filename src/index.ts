@@ -19,41 +19,23 @@ import {
   selectAgentsInteractive,
   type InstallScope,
 } from "./agents.js";
-import {
-  getFindRegistries,
-  getLastSelectedAgents,
-  getConfigPath,
-  saveFindRegistries,
-} from "./config.js";
+import { getLastSelectedAgents } from "./config.js";
 import { parseSource, isRemoteSource } from "./source-parser.js";
 import {
-  getDefaultFindRegistries,
-  runFind,
-  type FindRegistrySearchConfig,
-} from "./find.js";
-import {
   buildServerConfig,
-  claudeCopilotGithubShadowError,
-  getConfigKey,
   installServer,
-  installServerForAgent,
   rewriteCopilotCliConfig,
   updateGitignoreWithPaths,
 } from "./installer.js";
+import type { InstallOutcome } from "./sg/types.js";
 import {
   listInstalledServers,
   findMatchingServers,
-  extractServerIdentity,
-  normalizeStoredCommand,
   type AgentServers,
   type InstalledServer,
 } from "./reader.js";
 import { removeServerFromConfig } from "./formats/index.js";
-import {
-  listOpenCodeServers,
-  removeOpenCodeServer,
-  relocateOpenCodeServer,
-} from "./opencode-config.js";
+import { removeOpenCodeServer } from "./opencode-config.js";
 import {
   hasTemplateVars,
   resolveArrayTemplates,
@@ -74,67 +56,16 @@ const RESET = "\x1b[0m";
 const DIM = "\x1b[38;5;102m";
 const TEXT = "\x1b[38;5;145m";
 
-// ASCII art logo for ADD-MCP
-const LOGO_LINES = [
-  " █████╗ ██████╗ ██████╗       ███╗   ███╗ ██████╗██████╗ ",
-  "██╔══██╗██╔══██╗██╔══██╗      ████╗ ████║██╔════╝██╔══██╗",
-  "███████║██║  ██║██║  ██║█████╗██╔████╔██║██║     ██████╔╝",
-  "██╔══██║██║  ██║██║  ██║╚════╝██║╚██╔╝██║██║     ██╔═══╝ ",
-  "██║  ██║██████╔╝██████╔╝      ██║ ╚═╝ ██║╚██████╗██║     ",
-  "╚═╝  ╚═╝╚═════╝ ╚═════╝       ╚═╝     ╚═╝ ╚═════╝╚═╝     ",
-];
-
-// Gradient grays for logo
-const GRAYS = [
-  "\x1b[38;5;250m",
-  "\x1b[38;5;248m",
-  "\x1b[38;5;245m",
-  "\x1b[38;5;243m",
-  "\x1b[38;5;240m",
-  "\x1b[38;5;238m",
-];
-
 function showLogo(): void {
   console.log();
-  LOGO_LINES.forEach((line, i) => {
-    console.log(`${GRAYS[i]}${line}${RESET}`);
-  });
+  console.log(
+    `${TEXT}StackGuardian${RESET} ${DIM}· add-sg-mcp v${version}${RESET}`,
+  );
+  console.log(
+    `${DIM}Connect your coding agents to the StackGuardian MCP server and skills${RESET}`,
+  );
 }
 
-function showBanner(): void {
-  showLogo();
-  console.log();
-  console.log(`${DIM}Add MCP servers to your favorite coding agents${RESET}`);
-  console.log();
-  console.log(
-    `  ${DIM}$${RESET} ${TEXT}npx add-mcp ${DIM}<url>${RESET}              ${DIM}Install remote MCP server${RESET}`,
-  );
-  console.log(
-    `  ${DIM}$${RESET} ${TEXT}npx add-mcp ${DIM}<package>${RESET}          ${DIM}Install npm package${RESET}`,
-  );
-  console.log(
-    `  ${DIM}$${RESET} ${TEXT}npx add-mcp ${DIM}<url> ${TEXT}-g${RESET}            ${DIM}Install globally${RESET}`,
-  );
-  console.log(
-    `  ${DIM}$${RESET} ${TEXT}npx add-mcp ${DIM}<url> ${TEXT}-a cursor${RESET}    ${DIM}Install to specific agent${RESET}`,
-  );
-  console.log(
-    `  ${DIM}$${RESET} ${TEXT}npx add-mcp find ${DIM}<keyword>${RESET}     ${DIM}Search integrations.sh MCP servers${RESET}`,
-  );
-  console.log();
-  console.log(
-    `${DIM}Supports:${RESET} Claude Code, Cursor, VS Code, OpenCode, and more`,
-  );
-  console.log();
-  console.log(
-    `${DIM}Learn more at${RESET} ${TEXT}https://github.com/neondatabase/add-mcp${RESET}`,
-  );
-  console.log();
-}
-
-/**
- * Shorten a path for display (replace home with ~)
- */
 function shortenPath(fullPath: string): string {
   const home = homedir();
   if (fullPath.startsWith(home)) {
@@ -180,27 +111,8 @@ interface Options {
   yes?: boolean;
   all?: boolean;
   gitignore?: boolean;
-}
-
-async function ensureFindRegistriesConfigured(): Promise<
-  FindRegistrySearchConfig[] | null
-> {
-  const configured = await getFindRegistries();
-  if (configured.length > 0) {
-    return configured;
-  }
-
-  const defaultRegistry = getDefaultFindRegistries()[0];
-  if (!defaultRegistry) {
-    throw new Error("No default find registry is configured");
-  }
-
-  const selectedRegistries = [defaultRegistry];
-  await saveFindRegistries(selectedRegistries);
-  p.log.info(
-    `Using ${defaultRegistry.label ?? defaultRegistry.url}. Saved to ${shortenPath(getConfigPath())} - you can remove or update it any time.`,
-  );
-  return selectedRegistries;
+  /** Route every agent to project scope without prompting (add-sg-mcp --project). */
+  local?: boolean;
 }
 
 function extractOptions(
@@ -311,39 +223,6 @@ function extractSubcommandOptionsFromArgv(): Partial<Options> {
   return result;
 }
 
-function inferFindPreferredTransport(
-  options: Options,
-): TransportType | undefined {
-  // Only infer from explicit agent flags; otherwise default to HTTP-first.
-  if (!options.agent || options.agent.length === 0) {
-    return undefined;
-  }
-
-  const resolvedAgents = options.agent
-    .map((value) => resolveAgentType(value))
-    .filter((value): value is AgentType => value !== null);
-
-  if (resolvedAgents.length === 0) {
-    return undefined;
-  }
-
-  const supportsHttp = resolvedAgents.some((agent) =>
-    isTransportSupported(agent, "http"),
-  );
-  if (supportsHttp) {
-    return undefined;
-  }
-
-  const supportsSse = resolvedAgents.every((agent) =>
-    isTransportSupported(agent, "sse"),
-  );
-
-  return supportsSse ? "sse" : undefined;
-}
-
-/**
- * Collect multiple values for repeatable options
- */
 function collect(value: string, previous: string[]): string[] {
   return previous.concat([value]);
 }
@@ -433,9 +312,9 @@ function omitEmptyStringValues(
 }
 
 program
-  .name("add-mcp")
+  .name("add-sg-mcp")
   .description(
-    "Install MCP servers for coding agents (Claude Code, Cursor, VS Code, OpenCode, Codex, and more — run list-agents for the full list)",
+    "Connect your coding agents to StackGuardian: installs the StackGuardian MCP server and skills (run list-agents for the supported agents)",
   )
   .version(version)
   .helpOption("--help", "display help for command")
@@ -509,136 +388,6 @@ program
     listAgents();
   });
 
-async function runFindCommand(
-  keyword: string | undefined,
-  rawOptions: Options | { opts: () => Options },
-) {
-  const options = {
-    ...extractOptions(rawOptions),
-    ...extractSubcommandOptionsFromArgv(),
-  };
-  const query = (keyword ?? "").trim();
-
-  const registries = await ensureFindRegistriesConfigured();
-  if (!registries) {
-    p.cancel("Find cancelled");
-    process.exit(0);
-  }
-
-  const installPlan = await runFind(query, {
-    yes: options.yes,
-    registries,
-    preferredTransport: inferFindPreferredTransport(options),
-  });
-
-  if (!installPlan) {
-    p.cancel("Find cancelled");
-    process.exit(0);
-  }
-
-  const mergedOptions: Options = {
-    ...options,
-    name: options.name || installPlan.serverName,
-    transport: installPlan.transport,
-    header: installPlan.headers
-      ? Object.entries(installPlan.headers).map(
-          ([key, value]) => `${key}: ${value}`,
-        )
-      : options.header,
-    env: installPlan.env
-      ? Object.entries(installPlan.env).map(([key, value]) => `${key}=${value}`)
-      : options.env,
-    args: installPlan.args ?? options.args,
-  };
-
-  await main(installPlan.target, mergedOptions);
-}
-
-program
-  .command("find [keyword]")
-  .description(
-    "Find MCP servers from integrations.sh registry data (omit keyword to browse)",
-  )
-  .option(
-    "-g, --global",
-    "Install globally (user-level) instead of project-level",
-  )
-  .option("-a, --agent <agent>", "Specify agents to install to", collect, [])
-  .option(
-    "-n, --name <name>",
-    "Server name override (defaults to catalog entry name)",
-  )
-  .option("-y, --yes", "Skip confirmation prompts")
-  .option(
-    "--auto-approve",
-    "Auto-approve MCP tool calls for agents that support it (Codex, Claude Code)",
-  )
-  .option(
-    "--approve-tool <tool>",
-    "Tool name to auto-approve when --auto-approve is set (repeatable; defaults to all tools)",
-    collect,
-    [],
-  )
-  .option("--all", "Install to all agents")
-  .option("--gitignore", "Add generated project config files to .gitignore")
-  .action(
-    async (
-      keyword: string | undefined,
-      options: Options | { opts: () => Options },
-    ) => {
-      await runFindCommand(keyword, options);
-    },
-  );
-
-program
-  .command("search [keyword]")
-  .description("Alias for find")
-  .option(
-    "-g, --global",
-    "Install globally (user-level) instead of project-level",
-  )
-  .option("-a, --agent <agent>", "Specify agents to install to", collect, [])
-  .option(
-    "-n, --name <name>",
-    "Server name override (defaults to catalog entry name)",
-  )
-  .option("-y, --yes", "Skip confirmation prompts")
-  .option(
-    "--auto-approve",
-    "Auto-approve MCP tool calls for agents that support it (Codex, Claude Code)",
-  )
-  .option(
-    "--approve-tool <tool>",
-    "Tool name to auto-approve when --auto-approve is set (repeatable; defaults to all tools)",
-    collect,
-    [],
-  )
-  .option("--all", "Install to all agents")
-  .option("--gitignore", "Add generated project config files to .gitignore")
-  .action(
-    async (
-      keyword: string | undefined,
-      options: Options | { opts: () => Options },
-    ) => {
-      await runFindCommand(keyword, options);
-    },
-  );
-
-// ── list command ──────────────────────────────────────────────────────────
-
-program
-  .command("list")
-  .description("List installed MCP servers across detected agents")
-  .option("-g, --global", "List global configs instead of project-level")
-  .option("-a, --agent <agent>", "Filter to specific agent(s)", collect, [])
-  .action(async (rawOptions: Options | { opts: () => Options }) => {
-    const options = {
-      ...extractOptions(rawOptions),
-      ...extractSubcommandOptionsFromArgv(),
-    };
-    await runListCommand(options);
-  });
-
 // ── remove command ───────────────────────────────────────────────────────
 
 program
@@ -657,99 +406,7 @@ program
     },
   );
 
-// ── sync / unify command ─────────────────────────────────────────────────
-
-program
-  .command("sync")
-  .description(
-    "Synchronize server names and installations across all detected agents",
-  )
-  .option("-g, --global", "Sync global configs instead of project-level")
-  .option("-y, --yes", "Skip confirmation prompts")
-  .action(async (rawOptions: Options | { opts: () => Options }) => {
-    const options = {
-      ...extractOptions(rawOptions),
-      ...extractSubcommandOptionsFromArgv(),
-    };
-    await runSyncCommand(options);
-  });
-
-program
-  .command("unify")
-  .description("Alias for sync")
-  .option("-g, --global", "Sync global configs instead of project-level")
-  .option("-y, --yes", "Skip confirmation prompts")
-  .action(async (rawOptions: Options | { opts: () => Options }) => {
-    const options = {
-      ...extractOptions(rawOptions),
-      ...extractSubcommandOptionsFromArgv(),
-    };
-    await runSyncCommand(options);
-  });
-
 program.parse();
-
-// ── list implementation ──────────────────────────────────────────────────
-
-async function runListCommand(options: Options): Promise<void> {
-  showLogo();
-  console.log();
-
-  const explicitAgents = resolveAgentFlags(options.agent);
-
-  const agentServersList = await listInstalledServers({
-    global: options.global,
-    agents: explicitAgents.length > 0 ? explicitAgents : undefined,
-  });
-
-  if (agentServersList.length === 0) {
-    const hint = options.global
-      ? "No agents detected globally. Use -a to target a specific agent."
-      : "No agents detected in this project. Use -g for global or -a to target a specific agent.";
-    p.log.info(hint);
-    console.log();
-    return;
-  }
-
-  let hadError = false;
-
-  for (const agentServers of agentServersList) {
-    if (!agentServers.detected) {
-      console.log(
-        `${TEXT}${agentServers.displayName}:${RESET} ${DIM}not detected${RESET}`,
-      );
-      continue;
-    }
-
-    if (agentServers.error) {
-      p.log.error(`${agentServers.displayName}: ${agentServers.error}`);
-      hadError = true;
-      continue;
-    }
-
-    if (agentServers.servers.length === 0) {
-      console.log(
-        `${TEXT}${agentServers.displayName}:${RESET} ${DIM}no servers configured${RESET}`,
-      );
-      continue;
-    }
-
-    console.log(`${TEXT}${agentServers.displayName}:${RESET}`);
-    for (const server of agentServers.servers) {
-      const identityHint = server.identity
-        ? ` ${DIM}(${server.identity})${RESET}`
-        : "";
-      console.log(
-        `  ${DIM}-${RESET} ${TEXT}${server.serverName}${RESET}${identityHint}`,
-      );
-    }
-  }
-
-  console.log();
-  if (hadError) {
-    process.exitCode = 1;
-  }
-}
 
 // ── remove implementation ────────────────────────────────────────────────
 
@@ -909,500 +566,6 @@ function getConfigKeyForServer(server: InstalledServer): string {
   return server.configKey;
 }
 
-// ── sync implementation ──────────────────────────────────────────────────
-
-interface SyncGroup {
-  identity: string;
-  entries: InstalledServer[];
-  canonicalName: string;
-  canonicalConfig: Record<string, unknown>;
-  hasConflict: boolean;
-  conflictReason?: string;
-}
-
-function deepEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (a === null || b === null) return false;
-  if (a === undefined || b === undefined) return a === b;
-  if (typeof a !== typeof b) return false;
-
-  if (Array.isArray(a) && Array.isArray(b)) {
-    if (a.length !== b.length) return false;
-    return a.every((val, i) => deepEqual(val, b[i]));
-  }
-
-  if (typeof a === "object" && typeof b === "object") {
-    const aObj = a as Record<string, unknown>;
-    const bObj = b as Record<string, unknown>;
-    const aKeys = Object.keys(aObj).sort();
-    const bKeys = Object.keys(bObj).sort();
-    if (!deepEqual(aKeys, bKeys)) return false;
-    return aKeys.every((key) => deepEqual(aObj[key], bObj[key]));
-  }
-
-  return false;
-}
-
-function pickCanonicalName(entries: InstalledServer[]): string {
-  const nameFreq = new Map<string, number>();
-  for (const entry of entries) {
-    nameFreq.set(entry.serverName, (nameFreq.get(entry.serverName) ?? 0) + 1);
-  }
-
-  const names = [...nameFreq.entries()];
-  names.sort(([nameA, freqA], [nameB, freqB]) => {
-    // Shortest first
-    if (nameA.length !== nameB.length) return nameA.length - nameB.length;
-    // Most frequent first
-    if (freqA !== freqB) return freqB - freqA;
-    // Alphabetical
-    return nameA.localeCompare(nameB);
-  });
-
-  return names[0]![0];
-}
-
-function extractConflictFields(config: Record<string, unknown>): {
-  headers: unknown;
-  env: unknown;
-  args: unknown;
-} {
-  return {
-    headers: config.headers ?? config.http_headers ?? null,
-    env: config.env ?? config.envs ?? config.environment ?? null,
-    args: normalizeStoredCommand(config).args,
-  };
-}
-
-function buildSyncGroups(agentServersList: AgentServers[]): SyncGroup[] {
-  // Group servers by identity
-  const byIdentity = new Map<string, InstalledServer[]>();
-
-  for (const agentServers of agentServersList) {
-    for (const server of agentServers.servers) {
-      if (!server.identity) continue;
-      const existing = byIdentity.get(server.identity) ?? [];
-      existing.push(server);
-      byIdentity.set(server.identity, existing);
-    }
-  }
-
-  const groups: SyncGroup[] = [];
-
-  for (const [identity, entries] of byIdentity) {
-    // Check for conflicts across entries
-    const fieldSets = entries.map((e) => extractConflictFields(e.config));
-    const reference = fieldSets[0]!;
-    let hasConflict = false;
-    let conflictReason: string | undefined;
-
-    for (let i = 1; i < fieldSets.length; i++) {
-      const other = fieldSets[i]!;
-      if (!deepEqual(reference.headers, other.headers)) {
-        hasConflict = true;
-        conflictReason = `headers differ between ${agents[entries[0]!.agentType].displayName} and ${agents[entries[i]!.agentType].displayName}`;
-        break;
-      }
-      if (!deepEqual(reference.env, other.env)) {
-        hasConflict = true;
-        conflictReason = `env differs between ${agents[entries[0]!.agentType].displayName} and ${agents[entries[i]!.agentType].displayName}`;
-        break;
-      }
-      if (!deepEqual(reference.args, other.args)) {
-        hasConflict = true;
-        conflictReason = `args differ between ${agents[entries[0]!.agentType].displayName} and ${agents[entries[i]!.agentType].displayName}`;
-        break;
-      }
-    }
-
-    groups.push({
-      identity,
-      entries,
-      canonicalName: pickCanonicalName(entries),
-      canonicalConfig: entries[0]!.config,
-      hasConflict,
-      conflictReason,
-    });
-  }
-
-  return groups;
-}
-
-async function runSyncCommand(options: Options): Promise<void> {
-  showLogo();
-  console.log();
-
-  const agentServersList = await listInstalledServers({
-    global: options.global,
-  });
-
-  const hadReadError = reportAgentReadErrors(agentServersList);
-  if (hadReadError) {
-    process.exitCode = 1;
-  }
-
-  const readable = agentsWithReadableConfigs(agentServersList);
-
-  if (hadReadError && readable.length < 2) {
-    console.log();
-    return;
-  }
-
-  if (readable.length < 2) {
-    p.log.info("Need at least 2 detected agents to sync");
-    console.log();
-    return;
-  }
-
-  const groups = buildSyncGroups(readable);
-  const detectedAgentTypes = new Set(readable.map((a) => a.agentType));
-
-  // Determine what needs to change
-  const renames: Array<{
-    group: SyncGroup;
-    agentType: AgentType;
-    oldName: string;
-  }> = [];
-  const additions: Array<{
-    group: SyncGroup;
-    agentType: AgentType;
-  }> = [];
-  const skipped: SyncGroup[] = [];
-
-  for (const group of groups) {
-    if (group.hasConflict) {
-      skipped.push(group);
-      continue;
-    }
-
-    const presentAgents = new Set(group.entries.map((e) => e.agentType));
-
-    // Find renames (agents that have this server under a different name)
-    for (const entry of group.entries) {
-      if (entry.serverName !== group.canonicalName) {
-        renames.push({
-          group,
-          agentType: entry.agentType,
-          oldName: entry.serverName,
-        });
-      }
-    }
-
-    // Find agents that are missing this server
-    for (const agentType of detectedAgentTypes) {
-      if (!presentAgents.has(agentType)) {
-        additions.push({ group, agentType });
-      }
-    }
-  }
-
-  const scope: "local" | "global" = options.global ? "global" : "local";
-  const layoutError =
-    scope === "local" &&
-    detectedAgentTypes.has("github-copilot-cli") &&
-    detectedAgentTypes.has("claude-code")
-      ? claudeCopilotGithubShadowError(process.cwd())
-      : null;
-  const isBlocked = (agentType: AgentType): boolean =>
-    Boolean(layoutError) &&
-    (agentType === "github-copilot-cli" || agentType === "claude-code");
-
-  const actionRenames = renames.filter((r) => !isBlocked(r.agentType));
-  const actionAdditions = additions.filter((a) => !isBlocked(a.agentType));
-  const blockedRenames = renames.filter((r) => isBlocked(r.agentType));
-  const blockedAdditions = additions.filter((a) => isBlocked(a.agentType));
-
-  if (
-    actionRenames.length === 0 &&
-    actionAdditions.length === 0 &&
-    blockedRenames.length === 0 &&
-    blockedAdditions.length === 0 &&
-    skipped.length === 0
-  ) {
-    if (!hadReadError) {
-      p.log.info("All servers are already in sync");
-    }
-    console.log();
-    return;
-  }
-
-  // Show sync plan
-  const planLines: string[] = [];
-
-  if (actionRenames.length > 0) {
-    planLines.push(chalk.cyan("Renames:"));
-    for (const r of actionRenames) {
-      planLines.push(
-        `  ${agents[r.agentType].displayName}: ${r.oldName} → ${r.group.canonicalName}`,
-      );
-    }
-  }
-
-  if (actionAdditions.length > 0) {
-    planLines.push(chalk.cyan("Additions:"));
-    for (const a of actionAdditions) {
-      planLines.push(
-        `  ${agents[a.agentType].displayName}: + ${a.group.canonicalName} (${a.group.identity})`,
-      );
-    }
-  }
-
-  if (blockedRenames.length > 0 || blockedAdditions.length > 0) {
-    planLines.push(chalk.yellow("Blocked:"));
-    for (const r of blockedRenames) {
-      planLines.push(
-        `  ${agents[r.agentType].displayName}: ${r.oldName} → ${r.group.canonicalName}`,
-      );
-    }
-    for (const a of blockedAdditions) {
-      planLines.push(
-        `  ${agents[a.agentType].displayName}: + ${a.group.canonicalName} (${a.group.identity})`,
-      );
-    }
-    if (layoutError) {
-      planLines.push(`  ${layoutError}`);
-    }
-  }
-
-  if (skipped.length > 0) {
-    planLines.push(chalk.yellow("Skipped (conflicts):"));
-    for (const s of skipped) {
-      planLines.push(`  ${s.identity}: ${s.conflictReason}`);
-    }
-  }
-
-  if (actionRenames.length === 0 && actionAdditions.length === 0) {
-    p.note(planLines.join("\n"), "Sync Plan");
-    if (layoutError) {
-      p.log.error(layoutError);
-      process.exitCode = 1;
-    } else if (!hadReadError) {
-      p.log.info(
-        "All servers are already in sync (some skipped due to conflicts)",
-      );
-    }
-    console.log();
-    return;
-  }
-
-  p.note(planLines.join("\n"), "Sync Plan");
-
-  if (!options.yes) {
-    const confirmed = await p.confirm({
-      message: "Proceed with sync?",
-    });
-
-    if (p.isCancel(confirmed) || !confirmed) {
-      p.log.info("No changes made");
-      console.log();
-      return;
-    }
-  }
-
-  let changeCount = 0;
-  let mutationFailed = false;
-  const renamed = new Set<(typeof actionRenames)[number]>();
-
-  // Write-first: install canonical names
-  for (const rename of actionRenames) {
-    const { group, agentType, oldName } = rename;
-    if (agentType === "opencode") {
-      const source = group.entries.find(
-        (item) => item.agentType === "opencode" && item.serverName === oldName,
-      );
-      if (!source) {
-        mutationFailed = true;
-        p.log.error(
-          `Failed to write ${group.canonicalName} to ${agents.opencode.displayName}: missing source entry ${oldName}`,
-        );
-        continue;
-      }
-      try {
-        relocateOpenCodeServer(source.configPath, oldName, group.canonicalName);
-        changeCount++;
-        renamed.add(rename);
-      } catch (error) {
-        mutationFailed = true;
-        p.log.error(
-          `Failed to write ${group.canonicalName} to ${agents.opencode.displayName}: ${error instanceof Error ? error.message : "Unknown error"}`,
-        );
-      }
-      continue;
-    }
-    const result = installServerForAgent(
-      group.canonicalName,
-      buildServerConfigFromStored(group.canonicalConfig),
-      agentType,
-      { local: scope === "local" },
-    );
-    if (result.success) {
-      changeCount++;
-      renamed.add(rename);
-    } else {
-      mutationFailed = true;
-      p.log.error(
-        `Failed to write ${group.canonicalName} to ${agents[agentType].displayName}: ${result.error}`,
-      );
-    }
-  }
-
-  for (const addition of actionAdditions) {
-    const { group, agentType } = addition;
-    if (agentType === "opencode") {
-      const opencode = readable.find((item) => item.agentType === "opencode");
-      if (opencode) {
-        const dest = listOpenCodeServers(opencode.configPath).find(
-          (entry) => entry.serverName === group.canonicalName,
-        );
-        if (dest) {
-          if (extractServerIdentity(dest.config) === group.identity) {
-            continue;
-          }
-          mutationFailed = true;
-          p.log.error(
-            `Failed to add ${group.canonicalName} to ${agents.opencode.displayName}: already has a different server named "${group.canonicalName}"`,
-          );
-          continue;
-        }
-      }
-    }
-    const result = installServerForAgent(
-      group.canonicalName,
-      buildServerConfigFromStored(group.canonicalConfig),
-      agentType,
-      { local: scope === "local" },
-    );
-    if (result.success) {
-      changeCount++;
-    } else {
-      mutationFailed = true;
-      p.log.error(
-        `Failed to add ${group.canonicalName} to ${agents[agentType].displayName}: ${result.error}`,
-      );
-    }
-  }
-
-  // Delete-second: remove old aliases
-  for (const rename of actionRenames) {
-    if (!renamed.has(rename)) {
-      continue;
-    }
-    const { group, agentType, oldName } = rename;
-    const agentConfig = agents[agentType];
-    const entry = group.entries.find((e) => e.agentType === agentType);
-    if (!entry) continue;
-
-    try {
-      if (agentType === "opencode") {
-        // relocateOpenCodeServer already removed oldName. A later add
-        // can reuse that name; deleting it here would drop the new server.
-        continue;
-      }
-      // Re-read the key after writes. Sharing .mcp.json can fold a Copilot
-      // bare map under mcpServers, so the listed key is stale.
-      removeServerFromConfig(
-        entry.configPath,
-        agentConfig.format,
-        getConfigKey(agentConfig, { local: scope === "local" }),
-        oldName,
-      );
-      rewriteCopilotCliConfig(agentType, entry.configPath);
-    } catch (error) {
-      mutationFailed = true;
-      p.log.error(
-        `Failed to remove old alias ${oldName} from ${agentConfig.displayName}: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
-    }
-  }
-
-  if (layoutError || mutationFailed) {
-    if (layoutError) {
-      p.log.error(layoutError);
-    }
-    process.exitCode = 1;
-  }
-
-  p.log.success(
-    `Synced ${changeCount} server${changeCount !== 1 ? "s" : ""} across ${detectedAgentTypes.size} agent${detectedAgentTypes.size !== 1 ? "s" : ""}`,
-  );
-  console.log();
-}
-
-const TRANSPORT_ALIASES: Record<string, "http" | "sse"> = {
-  http: "http",
-  sse: "sse",
-  streamable_http: "http",
-  streamableHttp: "http",
-  "streamable-http": "http",
-  remote: "http",
-};
-
-function normalizeTransportType(
-  raw: unknown,
-): import("./types.js").TransportType {
-  if (typeof raw === "string" && raw in TRANSPORT_ALIASES) {
-    return TRANSPORT_ALIASES[raw]!;
-  }
-  return "http";
-}
-
-function buildServerConfigFromStored(
-  config: Record<string, unknown>,
-): import("./types.js").McpServerConfig {
-  const httpUrl =
-    typeof config.httpUrl === "string" && config.httpUrl.length > 0
-      ? config.httpUrl
-      : undefined;
-  const url =
-    httpUrl ??
-    (typeof config.url === "string"
-      ? config.url
-      : typeof config.uri === "string"
-        ? config.uri
-        : typeof config.serverUrl === "string"
-          ? config.serverUrl
-          : undefined);
-
-  if (url) {
-    const result: import("./types.js").McpServerConfig = {
-      type: httpUrl
-        ? "http"
-        : normalizeTransportType(config.type ?? config.transport),
-      url,
-    };
-
-    const headers =
-      config.headers && typeof config.headers === "object"
-        ? (config.headers as Record<string, string>)
-        : config.http_headers && typeof config.http_headers === "object"
-          ? (config.http_headers as Record<string, string>)
-          : undefined;
-
-    if (headers && Object.keys(headers).length > 0) {
-      result.headers = headers;
-    }
-
-    return result;
-  }
-
-  const { command, args } = normalizeStoredCommand(config);
-
-  const env =
-    config.env && typeof config.env === "object"
-      ? (config.env as Record<string, string>)
-      : config.envs && typeof config.envs === "object"
-        ? (config.envs as Record<string, string>)
-        : config.environment && typeof config.environment === "object"
-          ? (config.environment as Record<string, string>)
-          : undefined;
-
-  const result: import("./types.js").McpServerConfig = {};
-  if (command) result.command = command;
-  if (args.length > 0) result.args = args;
-  if (env && Object.keys(env).length > 0) result.env = env;
-  return result;
-}
-
 // ── helper: resolve -a flags ─────────────────────────────────────────────
 
 function resolveAgentFlags(agentFlags?: string[]): AgentType[] {
@@ -1496,36 +659,9 @@ async function main(target: string | undefined, options: Options) {
   // Always show the logo
   showLogo();
 
-  // Show full banner (with help) when no target is provided
   if (!target) {
-    console.log();
-    console.log(`${DIM}Add MCP servers to your favorite coding agents${RESET}`);
-    console.log();
-    console.log(
-      `  ${DIM}$${RESET} ${TEXT}npx add-mcp ${DIM}<url>${RESET}              ${DIM}Install remote MCP server${RESET}`,
-    );
-    console.log(
-      `  ${DIM}$${RESET} ${TEXT}npx add-mcp ${DIM}<package>${RESET}          ${DIM}Install npm package${RESET}`,
-    );
-    console.log(
-      `  ${DIM}$${RESET} ${TEXT}npx add-mcp ${DIM}<url> ${TEXT}-g${RESET}            ${DIM}Install globally${RESET}`,
-    );
-    console.log(
-      `  ${DIM}$${RESET} ${TEXT}npx add-mcp ${DIM}<url> ${TEXT}-a cursor${RESET}    ${DIM}Install to specific agent${RESET}`,
-    );
-    console.log(
-      `  ${DIM}$${RESET} ${TEXT}npx add-mcp find ${DIM}<keyword>${RESET}     ${DIM}Search integrations.sh MCP servers${RESET}`,
-    );
-    console.log();
-    console.log(
-      `${DIM}Supports:${RESET} Claude Code, Cursor, VS Code, OpenCode, and more`,
-    );
-    console.log();
-    console.log(
-      `${DIM}Learn more at${RESET} ${TEXT}https://github.com/neondatabase/add-mcp${RESET}`,
-    );
-    console.log();
-    process.exit(0);
+    p.log.error("No server target given");
+    process.exit(1);
   }
 
   console.log();
@@ -1937,7 +1073,20 @@ async function main(target: string | undefined, options: Options) {
   // Determine one common installation scope (global vs project). The CLI never
   // mixes scopes within a single install: if any selected agent is global-only,
   // global is the only common scope.
-  if (options.global) {
+  if (options.local) {
+    // Explicit project flag - route all agents to project scope
+    const noProject = targetAgents.filter((a) => !supportsProjectConfig(a));
+    if (noProject.length > 0) {
+      p.log.error(
+        `These agents have no project-level config: ${noProject.map((a) => agents[a].displayName).join(", ")}. Drop --project or deselect them.`,
+      );
+      process.exit(1);
+    }
+    agentRouting = new Map();
+    for (const agent of targetAgents) {
+      agentRouting.set(agent, "local");
+    }
+  } else if (options.global) {
     // Explicit global flag - route all agents to global
     agentRouting = new Map();
     for (const agent of targetAgents) {
@@ -2138,15 +1287,22 @@ async function main(target: string | undefined, options: Options) {
     }
   }
 
+  const outcome: InstallOutcome = {
+    serverName,
+    targetAgents,
+    routing: agentRouting,
+    results,
+  };
   console.log();
   if (failed.length === 0) {
     p.outro(chalk.green("Done!"));
-    return;
+    return outcome;
   }
   process.exitCode = 1;
   if (successful.length === 0) {
     p.outro(chalk.red("Failed"));
-    return;
+    return outcome;
   }
   p.outro(chalk.yellow("Installed with errors"));
+  return outcome;
 }
