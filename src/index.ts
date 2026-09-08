@@ -24,16 +24,10 @@ import { parseSource, isRemoteSource } from "./source-parser.js";
 import {
   buildServerConfig,
   installServer,
-  rewriteCopilotCliConfig,
   updateGitignoreWithPaths,
 } from "./installer.js";
 import type { InstallOutcome } from "./sg/types.js";
-import {
-  listInstalledServers,
-  findMatchingServers,
-  type AgentServers,
-  type InstalledServer,
-} from "./reader.js";
+import { registerSgCommands, runConnect } from "./sg/commands.js";
 import { removeServerFromConfig } from "./formats/index.js";
 import { removeOpenCodeServer } from "./opencode-config.js";
 import {
@@ -113,6 +107,8 @@ interface Options {
   gitignore?: boolean;
   /** Route every agent to project scope without prompting (add-sg-mcp --project). */
   local?: boolean;
+  /** The StackGuardian flow prints its own banner before calling main. */
+  noLogo?: boolean;
 }
 
 function extractOptions(
@@ -311,6 +307,13 @@ function omitEmptyStringValues(
   );
 }
 
+const sgDeps = {
+  main,
+  resolveAgentFlags,
+  collect,
+  showLogo,
+};
+
 program
   .name("add-sg-mcp")
   .description(
@@ -318,7 +321,10 @@ program
   )
   .version(version)
   .helpOption("--help", "display help for command")
-  .argument("[target]", "MCP server URL (remote) or package name (local stdio)")
+  .argument(
+    "[target]",
+    "Advanced: install another MCP server instead (URL or package); omit to connect StackGuardian",
+  )
   .option(
     "-g, --global",
     "Install globally (user-level) instead of project-level",
@@ -378,7 +384,11 @@ program
   .option("--all", "Install to all agents")
   .option("--gitignore", "Add generated project config files to .gitignore")
   .action(async (target: string | undefined, options: Options) => {
-    await main(target, options);
+    if (target) {
+      await main(target, options);
+      return;
+    }
+    await runConnect(options, sgDeps);
   });
 
 program
@@ -388,183 +398,9 @@ program
     listAgents();
   });
 
-// ── remove command ───────────────────────────────────────────────────────
-
-program
-  .command("remove <query>")
-  .description("Remove an MCP server from agent configurations")
-  .option("-g, --global", "Remove from global configs instead of project-level")
-  .option("-a, --agent <agent>", "Filter to specific agent(s)", collect, [])
-  .option("-y, --yes", "Remove all matches without prompting")
-  .action(
-    async (query: string, rawOptions: Options | { opts: () => Options }) => {
-      const options = {
-        ...extractOptions(rawOptions),
-        ...extractSubcommandOptionsFromArgv(),
-      };
-      await runRemoveCommand(query, options);
-    },
-  );
+registerSgCommands(program, sgDeps);
 
 program.parse();
-
-// ── remove implementation ────────────────────────────────────────────────
-
-async function runRemoveCommand(
-  query: string,
-  options: Options,
-): Promise<void> {
-  showLogo();
-  console.log();
-
-  const explicitAgents = resolveAgentFlags(options.agent);
-
-  const agentServersList = await listInstalledServers({
-    global: options.global,
-    agents: explicitAgents.length > 0 ? explicitAgents : undefined,
-  });
-
-  const hadReadError = reportAgentReadErrors(agentServersList);
-  const matches = findMatchingServers(
-    agentsWithReadableConfigs(agentServersList),
-    query,
-  );
-
-  if (matches.length === 0) {
-    if (!hadReadError) {
-      p.log.info(`No matching servers found for '${query}'`);
-    }
-    if (hadReadError) {
-      process.exitCode = 1;
-    }
-    console.log();
-    return;
-  }
-
-  if (
-    matches.some(
-      (server) =>
-        (server.agentType === "claude-code" ||
-          server.agentType === "github-copilot-cli") &&
-        server.configPath.endsWith(".mcp.json"),
-    )
-  ) {
-    p.log.warn(
-      "`.mcp.json` is shared by Claude Code and GitHub Copilot CLI. Removing a server from either removes it for both.",
-    );
-  }
-
-  // Build selection options
-  const matchOptions = matches.map((m, i) => ({
-    value: i,
-    label: `${m.serverName} (${agents[m.agentType].displayName})`,
-    hint: m.identity || m.configPath,
-  }));
-
-  let selectedIndices: number[];
-
-  if (options.yes) {
-    selectedIndices = matches.map((_, i) => i);
-    p.log.info(
-      `Removing ${matches.length} server${matches.length !== 1 ? "s" : ""} matching '${query}'`,
-    );
-  } else {
-    const selected = await p.multiselect({
-      message: `Select servers to remove (${matches.length} match${matches.length !== 1 ? "es" : ""} found)`,
-      options: matchOptions,
-      required: false,
-      initialValues: matches.map((_, i) => i),
-    });
-
-    if (p.isCancel(selected)) {
-      p.log.info("No changes made");
-      console.log();
-      return;
-    }
-
-    selectedIndices = selected as number[];
-
-    if (selectedIndices.length === 0) {
-      p.log.info("No changes made");
-      console.log();
-      return;
-    }
-  }
-
-  let removedCount = 0;
-  const affectedAgents = new Set<string>();
-  let mutationFailed = false;
-
-  for (const idx of selectedIndices) {
-    const server = matches[idx]!;
-    const agent = agents[server.agentType];
-    try {
-      if (server.agentType === "opencode") {
-        removeOpenCodeServer(server.configPath, server.serverName);
-      } else {
-        removeServerFromConfig(
-          server.configPath,
-          agent.format,
-          getConfigKeyForServer(server),
-          server.serverName,
-        );
-        rewriteCopilotCliConfig(server.agentType, server.configPath);
-      }
-      removedCount++;
-      affectedAgents.add(agent.displayName);
-    } catch (error) {
-      mutationFailed = true;
-      p.log.error(
-        `Failed to remove ${server.serverName} from ${agent.displayName}: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
-    }
-  }
-
-  if (removedCount > 0) {
-    p.log.success(
-      `Removed ${removedCount} server${removedCount !== 1 ? "s" : ""} from ${affectedAgents.size} agent${affectedAgents.size !== 1 ? "s" : ""}`,
-    );
-  }
-
-  if (hadReadError || mutationFailed) {
-    process.exitCode = 1;
-  }
-
-  console.log();
-}
-
-function failedConfigPaths(agentServersList: AgentServers[]): Set<string> {
-  return new Set(
-    agentServersList
-      .filter((agentServers) => agentServers.error)
-      .map((agentServers) => agentServers.configPath),
-  );
-}
-
-function agentsWithReadableConfigs(
-  agentServersList: AgentServers[],
-): AgentServers[] {
-  const failedPaths = failedConfigPaths(agentServersList);
-  return agentServersList.filter(
-    (agentServers) =>
-      !agentServers.error && !failedPaths.has(agentServers.configPath),
-  );
-}
-
-function reportAgentReadErrors(agentServersList: AgentServers[]): boolean {
-  let hadError = false;
-  for (const agentServers of agentServersList) {
-    if (agentServers.error) {
-      p.log.error(`${agentServers.displayName}: ${agentServers.error}`);
-      hadError = true;
-    }
-  }
-  return hadError;
-}
-
-function getConfigKeyForServer(server: InstalledServer): string {
-  return server.configKey;
-}
 
 // ── helper: resolve -a flags ─────────────────────────────────────────────
 
@@ -656,8 +492,9 @@ async function main(target: string | undefined, options: Options) {
   // --all just selects all agents, doesn't imply --yes or --global
   // Use --yes to skip prompts, --global to install globally
 
-  // Always show the logo
-  showLogo();
+  if (!options.noLogo) {
+    showLogo();
+  }
 
   if (!target) {
     p.log.error("No server target given");

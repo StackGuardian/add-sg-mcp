@@ -9,3 +9,17 @@ export interface InstallOutcome {
   routing: Map<AgentType, InstallScope>;
   results: Map<AgentType, InstallResult>;
 }
+
+/** The subset of upstream's CLI options the StackGuardian flow hands to `main`. */
+export interface MainOptions {
+  global?: boolean;
+  local?: boolean;
+  agent?: string[];
+  name?: string;
+  transport?: string;
+  header?: string[];
+  yes?: boolean;
+  all?: boolean;
+  gitignore?: boolean;
+  noLogo?: boolean;
+}
