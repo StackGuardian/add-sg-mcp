@@ -273,13 +273,20 @@ export async function resolveCredentials(
   if (!forceLogin) {
     const saved = readCredentials();
     if (saved) {
+      let requestedOrigin: string | undefined;
+      if (options.dashboardUrl) {
+        try {
+          requestedOrigin = new URL(options.dashboardUrl).origin;
+        } catch {
+          fail(`--dashboard-url is not a URL: ${options.dashboardUrl}`);
+        }
+      }
       const orgMatches = !options.org || options.org === saved.org;
       const envMatches =
         (!options.region ||
           environmentForRegion(options.region)?.dashboardUrl ===
             saved.dashboardUrl) &&
-        (!options.dashboardUrl ||
-          new URL(options.dashboardUrl).origin === saved.dashboardUrl);
+        (!requestedOrigin || requestedOrigin === saved.dashboardUrl);
       if (orgMatches && envMatches) {
         p.log.info(
           `Using saved credentials for ${chalk.cyan(saved.org)} (${saved.dashboardUrl || saved.apiBase}). Run ${chalk.cyan("add-sg-mcp login")} to switch.`,
@@ -457,6 +464,11 @@ export async function runConnect(
       (isInteractive() ? await chooseRegion() : fail("Pass --region eu|us."));
     const env = environmentForRegion(region);
     if (!env) fail(`Unknown region "${region}".`);
+    if (options.apiBase && !isAllowedApiBase(options.apiBase)) {
+      fail(
+        `--api-base must be an https StackGuardian host, got ${options.apiBase}`,
+      );
+    }
     apiBase = options.apiBase ?? env.apiBase;
     allowed = OAUTH_CAPABLE_AGENTS.filter(
       (a) => !PRESET_EXCLUDED_AGENTS.includes(a),

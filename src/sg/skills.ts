@@ -212,17 +212,7 @@ function upsertEntry(entries: ManifestEntry[], entry: ManifestEntry): void {
   else entries.push(entry);
 }
 
-function skillNameIn(path: string): string | null {
-  try {
-    const head = readFileSync(join(path, "SKILL.md"), "utf-8").slice(0, 2048);
-    const match = head.match(/^---\r?\n(?:[\s\S]*?\n)?name:\s*([^\r\n]+)/);
-    return match?.[1]?.trim() ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/** A path is ours when it is a symlink, recorded in the manifest, or an sg-* skill by frontmatter. */
+/** A path is ours only when it is a symlink or a directory this tool recorded in its manifest. */
 function isOurs(
   path: string,
   skill: string,
@@ -236,15 +226,10 @@ function isOurs(
   }
   if (stat.isSymbolicLink()) return true;
   if (!stat.isDirectory()) return false;
-  if (
-    entries.some(
-      (e) =>
-        e.skill === skill && (e.canonicalPath === path || e.linkPath === path),
-    )
-  ) {
-    return true;
-  }
-  return skillNameIn(path) === skill;
+  return entries.some(
+    (e) =>
+      e.skill === skill && (e.canonicalPath === path || e.linkPath === path),
+  );
 }
 
 function removePath(path: string): void {
@@ -378,6 +363,8 @@ export function removeSkills(
   const home = options.home ?? homedir();
   const manifestPath = manifestPathFor(options);
   let entries = readManifest(manifestPath);
+  // Ownership is judged against the manifest as it was before this call drops entries.
+  const recorded = [...entries];
   const canonicalDir = canonicalSkillsDir(scope, cwd, home);
   const removed: string[] = [];
   const errors: string[] = [];
@@ -389,7 +376,7 @@ export function removeSkills(
         const linkPath = join(agentDir, skill);
         if (
           (existsSync(linkPath) || isSymlink(linkPath)) &&
-          isOurs(linkPath, skill, entries)
+          isOurs(linkPath, skill, recorded)
         ) {
           try {
             removePath(linkPath);
@@ -419,7 +406,7 @@ export function removeSkills(
     if (stillUsed) continue;
     if (
       (existsSync(canonicalPath) || isSymlink(canonicalPath)) &&
-      isOurs(canonicalPath, skill, entries)
+      isOurs(canonicalPath, skill, recorded)
     ) {
       try {
         removePath(canonicalPath);

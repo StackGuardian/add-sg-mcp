@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -85,15 +86,18 @@ export function writeCredentials(credentials: SgCredentials): string {
     version: CURRENT_VERSION,
     current: credentials,
   };
-  writeFileSync(path, `${JSON.stringify(content, null, 2)}\n`, {
+  // Write next to the target and rename so a crash never leaves a torn file.
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify(content, null, 2)}\n`, {
     encoding: "utf-8",
     mode: 0o600,
   });
   try {
-    chmodSync(path, 0o600);
+    chmodSync(tmp, 0o600);
   } catch {
-    // Best effort (Windows).
+    // Best effort: Windows has no POSIX modes; the profile folder ACL applies.
   }
+  renameSync(tmp, path);
   return path;
 }
 

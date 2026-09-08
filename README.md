@@ -101,6 +101,7 @@ npx add-sg-mcp --name stackguardian-other -a claude-code
 
 ## Security
 
+- On Windows there is no `0600` equivalent; the file relies on the ACL of your profile folder.
 - The credential is your **user API key for the selected organization**: it acts as you, with your roles, and it does not expire on its own. Rotate it from _Profile → API keys_ in the dashboard if a machine is lost; `logout` only deletes the local copy.
 - By default nothing is written into project directories. `--project` warns and adds the generated files to `.gitignore`.
 - The CLI accepts a callback only when its one-time `state` matches, and only API hosts under `stackguardian.io` (or the host you passed with `--dashboard-url`).
