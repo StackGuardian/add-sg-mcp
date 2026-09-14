@@ -154,8 +154,10 @@ States: invalid params → error Alert; org picker + consent ("**add-sg-mcp**
 running on this machine asked to connect to StackGuardian as {email}. Only
 continue if you just ran this command yourself.") with Connect / Cancel;
 SSO user not in rolebindings (`useRoleBindings`, same rule as
-`TerraformLogin`) → Alert linking to the org's API Access tab plus the manual
-command; connecting → spinner, then `window.location.assign(callbackUrl)`;
+`TerraformLogin`) has no personal key → the page opens the design-system
+`CreateApiAccessModal` for the chosen org and, once the platform returns the
+new `sgo_` key, hands it to the CLI like a personal key (the authorizer
+accepts `sgo_` keys on the org MCP route with the access's roles); connecting → spinner, then `window.location.assign(callbackUrl)`;
 a fallback panel ("Terminal didn't pick it up? Paste this:"
 `npx add-sg-mcp login --token <key> --org <org> --api-base <base>` with
 `CopyToClipboard`) is rendered before navigation so Back shows it. Cancel
