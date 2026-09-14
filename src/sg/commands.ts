@@ -17,7 +17,9 @@ import {
   OAUTH_CAPABLE_AGENTS,
   PRESET_EXCLUDED_AGENTS,
   SG_ENVIRONMENTS,
-  SG_SERVER_NAME,
+  SG_SERVER_NAME_PREFIX,
+  isStackGuardianServer,
+  serverNameForOrg,
   buildAuthHeader,
   buildMcpUrl,
   environmentForRegion,
@@ -486,7 +488,7 @@ export async function runConnect(
   const targetAgents = await chooseAgents(options, deps, allowed);
   const url = buildMcpUrl(apiBase, org);
   const outcome = await deps.main(url, {
-    name: options.name ?? SG_SERVER_NAME,
+    name: options.name ?? serverNameForOrg(org),
     transport: "http",
     header: headers,
     agent: targetAgents,
@@ -582,10 +584,8 @@ export async function runStatus(deps: SgCommandDeps): Promise<void> {
     });
     const skills = skillsStatus(allAgents, scope, process.cwd());
     for (const entry of servers) {
-      const match = entry.servers.find(
-        (s) =>
-          s.serverName === SG_SERVER_NAME ||
-          serverUrl(s.config).includes("stackguardian.io"),
+      const match = entry.servers.find((s) =>
+        isStackGuardianServer(s.serverName, serverUrl(s.config)),
       );
       const skillCount = skills.get(entry.agentType)?.length ?? 0;
       if (!match && skillCount === 0) continue;
@@ -612,7 +612,7 @@ export async function runRemove(
     console.log();
   }
   const scope = scopeOf(options);
-  const name = options.name ?? SG_SERVER_NAME;
+  const explicitName = options.name;
   const targets =
     options.agent && options.agent.length > 0
       ? deps.resolveAgentFlags(options.agent)
@@ -620,7 +620,7 @@ export async function runRemove(
 
   if (!options.yes && isInteractive()) {
     const confirmed = await p.confirm({
-      message: `Remove the ${name} server and the StackGuardian skills from ${targets.length} agent${targets.length === 1 ? "" : "s"} (${scope === "global" ? "user" : "project"} scope)?`,
+      message: `Remove ${explicitName ? `the ${explicitName} server` : "the StackGuardian MCP server entries"} and the StackGuardian skills from ${targets.length} agent${targets.length === 1 ? "" : "s"} (${scope === "global" ? "user" : "project"} scope)?`,
     });
     if (p.isCancel(confirmed) || !confirmed) {
       p.cancel("Cancelled");
@@ -632,19 +632,25 @@ export async function runRemove(
   let failures = 0;
   for (const agent of targets) {
     if (scope === "local" && !agents[agent].localConfigPath) continue;
-    const result = removeServer(agent, name, {
-      local: scope === "local",
-      cwd: process.cwd(),
-    });
-    if (!result.success) {
-      failures++;
-      lines.push(
-        `${chalk.red("✗")} ${agents[agent].displayName}: ${chalk.dim(result.error)}`,
-      );
-    } else if (result.removed) {
-      lines.push(
-        `${chalk.green("✓")} ${agents[agent].displayName}: removed ${chalk.dim(shortenHome(result.path))}`,
-      );
+    // Without --name, remove every entry of ours in this agent (any org, either name generation).
+    const names = explicitName
+      ? [explicitName]
+      : await stackGuardianServerNames(agent, scope);
+    for (const name of names) {
+      const result = removeServer(agent, name, {
+        local: scope === "local",
+        cwd: process.cwd(),
+      });
+      if (!result.success) {
+        failures++;
+        lines.push(
+          `${chalk.red("✗")} ${agents[agent].displayName}: ${chalk.dim(result.error)}`,
+        );
+      } else if (result.removed) {
+        lines.push(
+          `${chalk.green("✓")} ${agents[agent].displayName}: removed ${name} from ${chalk.dim(shortenHome(result.path))}`,
+        );
+      }
     }
   }
   const skills = removeSkills(targets, scope, process.cwd());
@@ -662,6 +668,22 @@ export async function runRemove(
   if (failures > 0) process.exitCode = 1;
   if (banner)
     p.outro(failures > 0 ? chalk.yellow("Removed with errors") : "Done");
+}
+
+async function stackGuardianServerNames(
+  agent: AgentType,
+  scope: InstallScope,
+): Promise<string[]> {
+  const listed = await listInstalledServers({
+    global: scope === "global",
+    agents: [agent],
+    cwd: process.cwd(),
+  });
+  return listed.flatMap((entry) =>
+    entry.servers
+      .filter((s) => isStackGuardianServer(s.serverName, serverUrl(s.config)))
+      .map((s) => s.serverName),
+  );
 }
 
 function addAuthOptions(command: Command): Command {
@@ -761,7 +783,10 @@ export function registerSgCommands(
       [],
     )
     .option("--project", "Project scope instead of user scope")
-    .option("-n, --name <name>", `Server name (default ${SG_SERVER_NAME})`)
+    .option(
+      "-n, --name <name>",
+      `Only this server entry (default: every ${SG_SERVER_NAME_PREFIX}-<org> entry)`,
+    )
     .option("-y, --yes", "Do not ask for confirmation")
     .action(async (_options: unknown, command: Command) => {
       await runRemove(command.optsWithGlobals() as SgInstallOptions, deps);

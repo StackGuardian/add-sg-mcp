@@ -1,7 +1,38 @@
 import type { AgentType } from "../types.js";
 
-/** Name of the MCP server entry written into every agent config. */
-export const SG_SERVER_NAME = "stackguardian";
+/** Prefix of the MCP server entry; the organization is appended so several orgs can coexist. */
+export const SG_SERVER_NAME_PREFIX = "StackGuardian";
+/** Entry name written before per-org naming; still recognised by status and remove. */
+export const LEGACY_SG_SERVER_NAME = "stackguardian";
+
+/**
+ * `StackGuardian-<org>`. Letters, digits, hyphens and underscores only: agents such as
+ * Claude Code reject anything else (server names feed the `mcp__<server>__<tool>` ids),
+ * and organization names are slugs, so the result is always valid.
+ */
+export function serverNameForOrg(org: string): string {
+  return `${SG_SERVER_NAME_PREFIX}-${org}`;
+}
+
+/** Whether a stored entry is ours: by either name generation, or by pointing at a StackGuardian MCP URL. */
+export function isStackGuardianServer(name: string, url?: string): boolean {
+  if (
+    name === LEGACY_SG_SERVER_NAME ||
+    name.startsWith(`${SG_SERVER_NAME_PREFIX}-`)
+  ) {
+    return true;
+  }
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.hostname.toLowerCase().endsWith(".stackguardian.io") &&
+      /\/orgs\/[^/]+\/mcp\/?$/.test(parsed.pathname)
+    );
+  } catch {
+    return false;
+  }
+}
 /** `client` query parameter the dashboard shows on the connect page. */
 export const SG_CLIENT_ID = "add-sg-mcp";
 /** Dashboard route that mints the credential and redirects to the loopback callback. */

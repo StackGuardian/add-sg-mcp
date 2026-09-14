@@ -1,7 +1,10 @@
 #!/usr/bin/env tsx
 import assert from "node:assert";
 import {
-  SG_SERVER_NAME,
+  SG_SERVER_NAME_PREFIX,
+  LEGACY_SG_SERVER_NAME,
+  serverNameForOrg,
+  isStackGuardianServer,
   SG_ENVIRONMENTS,
   PRESET_EXCLUDED_AGENTS,
   environmentForRegion,
@@ -31,8 +34,24 @@ function test(name: string, fn: () => void) {
   }
 }
 
-test("server name and excluded agents are fixed", () => {
-  assert.strictEqual(SG_SERVER_NAME, "stackguardian");
+test("server names are StackGuardian-<org> and recognised alongside the legacy name", () => {
+  assert.strictEqual(SG_SERVER_NAME_PREFIX, "StackGuardian");
+  assert.strictEqual(serverNameForOrg("demo-org"), "StackGuardian-demo-org");
+  assert.match(serverNameForOrg("Org_1"), /^[A-Za-z0-9_-]+$/);
+  assert.strictEqual(isStackGuardianServer("StackGuardian-demo-org"), true);
+  assert.strictEqual(isStackGuardianServer(LEGACY_SG_SERVER_NAME), true);
+  assert.strictEqual(
+    isStackGuardianServer(
+      "my-sg",
+      "https://api.app.stackguardian.io/api/v1/orgs/demo-org/mcp/",
+    ),
+    true,
+  );
+  assert.strictEqual(
+    isStackGuardianServer("context7", "https://mcp.context7.com/mcp"),
+    false,
+  );
+  assert.strictEqual(isStackGuardianServer("StackGuardianX"), false);
   assert.deepStrictEqual([...PRESET_EXCLUDED_AGENTS], ["claude-desktop", "fx"]);
 });
 

@@ -4,7 +4,7 @@
 
 First release of `add-sg-mcp`, a StackGuardian-specific fork of `add-mcp` 2.4.0.
 
-- `npx add-sg-mcp` signs in through the StackGuardian dashboard (organization picker, loopback callback), stores the organization API key locally and installs the `stackguardian` MCP server into every selected coding agent.
+- `npx add-sg-mcp` signs in through the StackGuardian dashboard (organization picker, loopback callback), stores the organization API key locally and installs the StackGuardian MCP server (one `StackGuardian-<org>` entry per organization) into every selected coding agent.
 - Installs the StackGuardian skills (`sg-create-workflow`, `sg-update-workflow`, `sg-upgrade-workflow`) into each agent's skills directory via a shared `~/.agents/skills` copy.
 - New commands: `login`, `logout [--purge]`, `status`, `remove`. Headless mode with `--token`/`SG_API_KEY`.
 - Default scope is the user profile; `--project` opts into project files and adds them to `.gitignore`.

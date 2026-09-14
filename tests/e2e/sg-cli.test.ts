@@ -83,6 +83,7 @@ function expectOk(result: ReturnType<typeof runCli>) {
 const KEY = "sgu_testtesttest1234";
 const TOKEN_ARGS = ["--token", KEY, "--org", "demo-org", "--region", "eu"];
 const URL = "https://api.app.stackguardian.io/api/v1/orgs/demo-org/mcp/";
+const NAME = "StackGuardian-demo-org";
 
 test("connect with --token -y --all writes every supported agent and the skills", () => {
   const home = createTempDir();
@@ -106,15 +107,18 @@ test("connect with --token -y --all writes every supported agent and the skills"
       { type: string; url: string; headers: Record<string, string> }
     >;
   };
-  assert.deepStrictEqual(claude.mcpServers.stackguardian, {
+  assert.deepStrictEqual(claude.mcpServers[NAME], {
     type: "http",
     url: URL,
     headers: { Authorization: `apikey ${KEY}` },
   });
 
   const codex = readFileSync(join(home, ".codex", "config.toml"), "utf-8");
-  assert.match(codex, /\[mcp_servers\.stackguardian\]/);
-  assert.match(codex, /\[mcp_servers\.stackguardian\.http_headers\]/);
+  assert.match(codex, /\[mcp_servers\.("?)StackGuardian-demo-org\1\]/);
+  assert.match(
+    codex,
+    /\[mcp_servers\.("?)StackGuardian-demo-org\1\.http_headers\]/,
+  );
   assert.match(codex, new RegExp(`Authorization = "apikey ${KEY}"`));
 
   for (const file of [
@@ -174,8 +178,8 @@ test("status reports the masked credential and installed agents; remove and logo
   assert.match(status, /Organization: demo-org/);
   assert.match(status, /sgu_…1234/);
   assert.ok(!status.includes(KEY));
-  assert.match(status, /Claude Code \(user\): stackguardian/);
-  assert.match(status, /Codex \(user\): stackguardian/);
+  assert.match(status, /Claude Code \(user\): StackGuardian-demo-org/);
+  assert.match(status, /Codex \(user\): StackGuardian-demo-org/);
   assert.match(status, /3 skills/);
 
   const removed = expectOk(runCli(["remove", "-y"], project, home));
@@ -185,10 +189,10 @@ test("status reports the masked credential and installed agents; remove and logo
   ) as {
     mcpServers?: Record<string, unknown>;
   };
-  assert.strictEqual(claude.mcpServers?.stackguardian, undefined);
+  assert.strictEqual(claude.mcpServers?.[NAME], undefined);
   assert.ok(
     !readFileSync(join(home, ".codex", "config.toml"), "utf-8").includes(
-      "stackguardian",
+      "StackGuardian-demo-org",
     ),
   );
   assert.strictEqual(
@@ -229,7 +233,7 @@ test("saved credentials are reused, and --project writes into the cwd with a .gi
   const mcp = JSON.parse(readFileSync(join(project, ".mcp.json"), "utf-8")) as {
     mcpServers: Record<string, { url: string }>;
   };
-  assert.strictEqual(mcp.mcpServers.stackguardian?.url, URL);
+  assert.strictEqual(mcp.mcpServers[NAME]?.url, URL);
   assert.ok(existsSync(join(project, ".cursor", "mcp.json")));
   const gitignore = readFileSync(join(project, ".gitignore"), "utf-8");
   assert.match(gitignore, /\.mcp\.json/);
@@ -372,10 +376,10 @@ test("--auth oauth writes a headerless entry for OAuth-capable agents only", () 
     mcpServers: Record<string, { url: string; headers?: unknown }>;
   };
   assert.strictEqual(
-    claude.mcpServers.stackguardian?.url,
+    claude.mcpServers[NAME]?.url,
     "https://api.us.stackguardian.io/api/v1/orgs/demo-org/mcp/",
   );
-  assert.strictEqual(claude.mcpServers.stackguardian?.headers, undefined);
+  assert.strictEqual(claude.mcpServers[NAME]?.headers, undefined);
   assert.strictEqual(
     existsSync(join(home, ".kiro", "settings", "mcp.json")),
     false,

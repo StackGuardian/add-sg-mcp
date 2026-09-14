@@ -8,7 +8,7 @@ npx add-sg-mcp
 
 It opens the StackGuardian dashboard so you can sign in and pick an organization, hands the credential back to your terminal, and then:
 
-- adds the **StackGuardian MCP server** (`stackguardian`) to the coding agents you choose, and
+- adds the **StackGuardian MCP server** (one entry per organization, named `StackGuardian-<org>`) to the coding agents you choose, and
 - installs the **StackGuardian skills** (`sg-create-workflow`, `sg-update-workflow`, `sg-upgrade-workflow`) so those agents know how to create, change and upgrade workflows through the MCP tools.
 
 Supported agents: Claude Code, Codex, Cursor, VS Code (Copilot), Gemini CLI, OpenCode, GitHub Copilot CLI, Windsurf, Kiro CLI, Zed, Cline, Goose, Grok Build, Kilo Code, Kimi Code, Antigravity, Pi, Mastra Code, MCPorter. Run `npx add-sg-mcp list-agents` for the current list.
@@ -23,7 +23,7 @@ Supported agents: Claude Code, Codex, Cursor, VS Code (Copilot), Gemini CLI, Ope
    ```json
    {
      "mcpServers": {
-       "stackguardian": {
+       "StackGuardian-<org>": {
          "type": "http",
          "url": "https://api.app.stackguardian.io/api/v1/orgs/<org>/mcp/",
          "headers": { "Authorization": "apikey sgu_…" }
@@ -36,7 +36,7 @@ Supported agents: Claude Code, Codex, Cursor, VS Code (Copilot), Gemini CLI, Ope
 
 5. The skills are copied to `~/.agents/skills/` and symlinked into each agent's skills directory (`~/.claude/skills`, `~/.codex/skills`, `~/.cursor/skills`, …), so a single copy serves every agent.
 
-Restart your agents afterwards. In Claude Code, `/mcp` lists the server and the skills appear as `/sg-create-workflow`, `/sg-update-workflow` and `/sg-upgrade-workflow`.
+Restart your agents afterwards. In Claude Code, `/mcp` lists `StackGuardian-<org>` and the skills appear as `/sg-create-workflow`, `/sg-update-workflow` and `/sg-upgrade-workflow`.
 
 ## Options
 
@@ -50,7 +50,7 @@ npx add-sg-mcp [options]
   -y, --yes                  No prompts (installs to all detected agents)
   --project                  Project scope (current directory) instead of your user profile;
                              the generated files are added to .gitignore
-  -n, --name <name>          Server entry name (default: stackguardian)
+  -n, --name <name>          Server entry name (default: StackGuardian-<org>)
   --skip-skills              Do not install the skills
   --no-browser               Print the sign-in link instead of opening a browser
   --login-timeout <seconds>  How long to wait for the browser (default 300)
@@ -81,12 +81,14 @@ SG_API_KEY=sgu_… SG_ORG=my-org SG_REGION=eu npx add-sg-mcp -y -a claude-code
 
 ### Several organizations
 
-Each server entry points at one organization. To keep two side by side, name the second one:
+Each server entry points at one organization and is named after it, so a second organization gets its own entry next to the first:
 
 ```bash
 npx add-sg-mcp login --org other-org --region eu
-npx add-sg-mcp --name stackguardian-other -a claude-code
+npx add-sg-mcp -a claude-code        # adds StackGuardian-other-org
 ```
+
+`remove` and `logout --purge` take every `StackGuardian-<org>` entry out again (pass `--name` to remove just one).
 
 ### OAuth (preview)
 

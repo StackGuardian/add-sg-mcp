@@ -40,7 +40,7 @@ Non-goals (this iteration):
 | D4  | Reuse upstream's agent table, config writers and installer **unchanged**; put all StackGuardian logic in `src/sg/*`.                                                                                                                         | Upstream adds agents every minor release; keeping `agents.ts`, `installer.ts`, `formats/*` byte-identical keeps `git merge upstream/main` cheap.                                                                                                                                                                                                                                                                                |
 | D5  | Skills ship **inside the npm package** (`skills/`), are installed to the cross-agent canonical directory (`~/.agents/skills/<name>` or `.agents/skills/<name>`) and **symlinked** into each agent's native skills directory (copy fallback). | Matches the `.agents/skills` convention the Agent Skills spec recommends and the layout the `skills` CLI already creates on developer machines.                                                                                                                                                                                                                                                                                 |
 | D6  | Skill names are prefixed `sg-` (`sg-create-workflow`, `sg-update-workflow`, `sg-upgrade-workflow`).                                                                                                                                          | Namespacing avoids collisions with generic "create-workflow" skills; `name` must equal the directory name.                                                                                                                                                                                                                                                                                                                      |
-| D7  | The MCP server entry is named `stackguardian` and points at `https://<api-host>/api/v1/orgs/<org>/mcp/`.                                                                                                                                     | `/mcp/` with trailing slash is the gateway resource that avoids a redirect (`lakehouse_mcp/path_prefix.py`). One org per entry; `--name` allows a second org side by side.                                                                                                                                                                                                                                                      |
+| D7  | The MCP server entry is named `StackGuardian-<org>` (hyphen, not a spaced dash: Claude Code and Codex only accept letters, digits, hyphens and underscores in server names) and points at `https://<api-host>/api/v1/orgs/<org>/mcp/`.       | `/mcp/` with trailing slash is the gateway resource that avoids a redirect (`lakehouse_mcp/path_prefix.py`). One entry per org; a second org simply adds a second entry.                                                                                                                                                                                                                                                        |
 | D8  | The dashboard page passes `api_base` back to the CLI, and the CLI accepts only `https` hosts ending in `.stackguardian.io`.                                                                                                                  | `app.stackguardian.io` and `us.stackguardian.io` are the same bundle; the API host is chosen at runtime from the browser hostname (`authUtils.getApiEndpointForCurrentRegion`). The allow-list closes the obvious redirect-injection hole.                                                                                                                                                                                      |
 
 ## 3. Architecture
@@ -97,7 +97,7 @@ fallbacks for `--token`, `--org`, `--api-base` (CI use).
 Install options (default command and `remove`): `-a/--agent` (repeatable),
 `--all`, `-y/--yes`, `--project` (project scope; warns and implies
 `--gitignore`), `-g/--global` (accepted, already the default), `-n/--name`
-(default `stackguardian`), `--skip-skills`, `--auth <apikey|oauth>` (default
+(default `StackGuardian-<org>`), `--skip-skills`, `--auth <apikey|oauth>` (default
 `apikey`).
 
 Interactive defaults: agents multiselect pre-checked with the agents detected
@@ -193,15 +193,15 @@ changes). With `stackguardian`, url `https://api.app.stackguardian.io/api/v1/org
 - Claude Code (`~/.claude.json`), VS Code (`mcp.json` → `servers`), Gemini CLI,
   MCPorter: `{"type":"http","url":…,"headers":{"Authorization":"apikey …"}}`
 - Cursor: same without `type`; Windsurf / Antigravity: `serverUrl` + `headers`
-- Codex (`~/.codex/config.toml`): `[mcp_servers.stackguardian]` `url` +
-  `[mcp_servers.stackguardian.http_headers]` (upstream rewrites the whole
+- Codex (`~/.codex/config.toml`): `[mcp_servers.StackGuardian-<org>]` `url` +
+  `[mcp_servers.StackGuardian-<org>.http_headers]` (upstream rewrites the whole
   TOML file; comments are lost — warned about in the summary)
 - OpenCode: `{"type":"remote","url":…,"headers":…}` under `mcp` (V1) or
   `mcp.servers` (V2)
 - Cline: `{"url":…,"type":"streamableHttp","headers":…}`; Kiro CLI: `{"url":…,"headers":…}`;
   Zed: `context_servers` `{"source":"custom","type":"http",…}`; Copilot CLI:
   `{"type":"http","url":…,"tools":["*"],"headers":…}`; Goose YAML
-  `extensions.stackguardian` `type: streamable_http`, `uri`, `headers`;
+  `extensions.StackGuardian-<org>` `type: streamable_http`, `uri`, `headers`;
   Grok Build TOML; Kilo; Kimi (`transport: http`); Pi; Mastra.
 - Excluded by the preset: `claude-desktop` (stdio-only), `fx` (Bearer-only).
   Selecting them explicitly prints why and skips them.
