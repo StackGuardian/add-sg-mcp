@@ -24,6 +24,34 @@ async function test(name: string, fn: () => Promise<void>) {
   }
 }
 
+function post(
+  url: string,
+  form: Record<string, string>,
+): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const body = new URLSearchParams(form).toString();
+    const req = http.request(
+      url,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          "content-length": Buffer.byteLength(body),
+        },
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (c) => (data += c));
+        res.on("end", () =>
+          resolve({ status: res.statusCode ?? 0, body: data }),
+        );
+      },
+    );
+    req.on("error", reject);
+    req.end(body);
+  });
+}
+
 function get(url: string): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
     http
@@ -88,6 +116,44 @@ await test("state mismatch and bad params answer 400 and keep listening", async 
   assert.strictEqual(ok.status, 200);
   const result = await server.result;
   assert.strictEqual(result.org, "demo-org");
+});
+
+await test("a form POST callback is accepted like GET; the page links back and never shows the key", async () => {
+  const server = await startCallbackServer(STATE, {
+    dashboardUrl: "https://app.stackguardian.io",
+  });
+  const res = await post(`http://127.0.0.1:${server.port}/callback`, {
+    state: STATE,
+    org: "demo-org",
+    api_key: KEY,
+    api_base: "https://api.app.stackguardian.io/api/v1",
+  });
+  assert.strictEqual(res.status, 200);
+  assert.ok(!res.body.includes(KEY));
+  assert.match(res.body, /href="https:\/\/app\.stackguardian\.io"/);
+  const result = await server.result;
+  assert.strictEqual(result.org, "demo-org");
+  assert.strictEqual(result.apiKey, KEY);
+});
+
+await test("a POST with the wrong state is refused and the server keeps listening", async () => {
+  const server = await startCallbackServer(STATE);
+  const bad = await post(`http://127.0.0.1:${server.port}/callback`, {
+    state: "nope_nope_nope_nope",
+    org: "demo-org",
+    api_key: KEY,
+    api_base: "https://api.app.stackguardian.io/api/v1",
+  });
+  assert.strictEqual(bad.status, 400);
+  assert.ok(!bad.body.includes("Back to StackGuardian"));
+  const ok = await post(`http://127.0.0.1:${server.port}/callback`, {
+    state: STATE,
+    org: "demo-org",
+    api_key: KEY,
+    api_base: "https://api.app.stackguardian.io/api/v1",
+  });
+  assert.strictEqual(ok.status, 200);
+  await server.result;
 });
 
 await test("extra allowed hosts are honoured for custom environments", async () => {
