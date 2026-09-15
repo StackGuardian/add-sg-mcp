@@ -18,13 +18,10 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
-  getFindRegistries,
   getLastSelectedAgents,
   getConfigPath,
   readConfig,
-  saveFindRegistries,
   saveSelectedAgents,
-  type AddMcpConfig,
 } from "../src/config.js";
 
 let passed = 0;
@@ -105,106 +102,10 @@ async function run() {
     assert.strictEqual(config.lastSelectedAgents, undefined);
   });
 
-  await test("saveFindRegistries persists registry selections", async () => {
-    setupTempHome();
-    await saveFindRegistries([
-      {
-        url: "https://add-mcp.com/registry/api/v1/servers",
-        label: "add-mcp registry",
-      },
-      {
-        url: "https://registry.modelcontextprotocol.io/v0.1/servers",
-        label: "Official Anthropic registry",
-      },
-    ]);
-    const registries = await getFindRegistries();
-    assert.deepStrictEqual(registries, [
-      {
-        url: "https://add-mcp.com/registry/api/v1/servers",
-        label: "add-mcp registry",
-      },
-      {
-        url: "https://registry.modelcontextprotocol.io/v0.1/servers",
-        label: "Official Anthropic registry",
-      },
-    ]);
-  });
-
-  await test("getFindRegistries migrates the legacy registry URL and persists it", async () => {
-    setupTempHome();
-    await saveFindRegistries([
-      {
-        url: "https://mcp.agent-tooling.dev/api/v1/servers",
-        label: "integrations.sh MCP registry",
-      },
-      {
-        url: "https://registry.modelcontextprotocol.io/v0.1/servers",
-        label: "Official Anthropic registry",
-      },
-    ]);
-
-    const registries = await getFindRegistries();
-    assert.deepStrictEqual(registries, [
-      {
-        url: "https://add-mcp.com/registry/api/v1/servers",
-        label: "add-mcp registry",
-      },
-      {
-        url: "https://registry.modelcontextprotocol.io/v0.1/servers",
-        label: "Official Anthropic registry",
-      },
-    ]);
-
-    const persisted = JSON.parse(
-      readFileSync(getConfigPath(), "utf-8"),
-    ) as AddMcpConfig;
-    assert.deepStrictEqual(persisted.findRegistries, registries);
-  });
-
-  await test("getFindRegistries keeps a custom label on the migrated URL", async () => {
-    setupTempHome();
-    await saveFindRegistries([
-      {
-        url: "https://mcp.agent-tooling.dev/api/v1/servers",
-        label: "My pinned registry",
-      },
-    ]);
-
-    const registries = await getFindRegistries();
-    assert.deepStrictEqual(registries, [
-      {
-        url: "https://add-mcp.com/registry/api/v1/servers",
-        label: "My pinned registry",
-      },
-    ]);
-  });
-
-  await test("getFindRegistries dedupes when old and new URLs both exist", async () => {
-    setupTempHome();
-    await saveFindRegistries([
-      {
-        url: "https://add-mcp.com/registry/api/v1/servers",
-        label: "add-mcp registry",
-      },
-      {
-        url: "https://mcp.agent-tooling.dev/api/v1/servers",
-        label: "integrations.sh MCP registry",
-      },
-    ]);
-
-    const registries = await getFindRegistries();
-    assert.deepStrictEqual(registries, [
-      {
-        url: "https://add-mcp.com/registry/api/v1/servers",
-        label: "add-mcp registry",
-      },
-    ]);
-  });
-
-  await test("config is written to ~/.config/add-mcp/config.json", async () => {
+  await test("config is written to ~/.config/add-sg-mcp/config.json", async () => {
     const home = setupTempHome();
     await saveSelectedAgents(["cursor"]);
-    const expectedPath = join(home, ".config", "add-mcp", "config.json");
+    const expectedPath = join(home, ".config", "add-sg-mcp", "config.json");
     assert.strictEqual(existsSync(expectedPath), true);
   });
 
@@ -218,12 +119,6 @@ async function run() {
       JSON.stringify({
         version: 1,
         lastSelectedAgents: ["cursor", "claude-code"],
-        findRegistries: [
-          {
-            url: "https://mcp.agent-tooling.dev/api/v1/servers",
-            label: "integrations.sh MCP registry",
-          },
-        ],
       }),
     );
 
@@ -232,9 +127,8 @@ async function run() {
       "cursor",
       "claude-code",
     ]);
-    assert.strictEqual(config.findRegistries?.length, 1);
 
-    const newPath = join(home, ".config", "add-mcp", "config.json");
+    const newPath = join(home, ".config", "add-sg-mcp", "config.json");
     assert.strictEqual(
       existsSync(newPath),
       true,
@@ -260,7 +154,7 @@ async function run() {
       }),
     );
 
-    const newPath = join(home, ".config", "add-mcp", "config.json");
+    const newPath = join(home, ".config", "add-sg-mcp", "config.json");
     mkdirSync(dirname(newPath), { recursive: true });
     writeFileSync(
       newPath,
@@ -281,7 +175,7 @@ async function run() {
 
     await saveSelectedAgents(["codex"]);
 
-    const expectedPath = join(customConfig, "add-mcp", "config.json");
+    const expectedPath = join(customConfig, "add-sg-mcp", "config.json");
     assert.strictEqual(existsSync(expectedPath), true);
 
     const saved = JSON.parse(readFileSync(expectedPath, "utf-8")) as {

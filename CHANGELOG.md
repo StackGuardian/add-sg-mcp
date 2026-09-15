@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.0 — StackGuardian fork
+
+First release of `add-sg-mcp`, a StackGuardian-specific fork of `add-mcp` 2.4.0.
+
+- `npx add-sg-mcp` signs in through the StackGuardian dashboard (organization picker, loopback callback), stores the organization API key locally and installs the StackGuardian MCP server (one `StackGuardian-<org>` entry per organization) into every selected coding agent.
+- Installs the StackGuardian skills (`sg-create-workflow`, `sg-update-workflow`, `sg-upgrade-workflow`) into each agent's skills directory via a shared `~/.agents/skills` copy.
+- New commands: `login`, `logout [--purge]`, `status`, `remove`. Headless mode with `--token`/`SG_API_KEY`.
+- Default scope is the user profile; `--project` opts into project files and adds them to `.gitignore`.
+- `--auth oauth` (preview) writes a credential-less entry for agents with built-in MCP OAuth.
+- Removed the registry site, `find`/`search`, `list` and `sync` commands from upstream.
+
+## Upstream history (add-mcp)
+
 ## [2.4.0] - 2026-09-07
 
 - read and write OpenCode V2 `mcp.servers` configs, including mixed V1/V2 files. Existing V1 `mcp.<name>` entries stay in that shape; a native entry wins when the same name exists in both maps. New files still use the V1 shape. A rename keeps the server in its existing map; if the destination name already exists for the same server, the alias is removed. If that name is a different server, the rename fails and both entries stay. Sync will not add an OpenCode server under a name that already holds a different server, and does not delete an OpenCode alias a second time after the rename. A rename onto `mcp.timeout` / `mcp.servers` settings translates `enabled`/`disabled`, V1 millisecond `timeout` to native `timeout.request`, and OAuth `clientId`/`client_id` field names. Kilo Code is unchanged.
