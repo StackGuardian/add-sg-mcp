@@ -53,11 +53,14 @@ const FIELDS: (keyof SgCredentials)[] = [
   "obtainedAt",
 ];
 
-/** True once a grant has passed its expiry; an expired credential counts as absent. */
+/**
+ * True once a grant has passed its expiry; an expired credential counts as
+ * absent. An expiry we cannot parse fails closed.
+ */
 export function isExpired(credentials: SgCredentials): boolean {
   if (!credentials.expiresAt) return false;
   const at = Date.parse(credentials.expiresAt);
-  return Number.isFinite(at) && at <= Date.now();
+  return !Number.isFinite(at) || at <= Date.now();
 }
 
 export function readCredentials(): SgCredentials | null {

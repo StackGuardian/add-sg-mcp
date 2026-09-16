@@ -156,7 +156,8 @@ test("isExpired is true only for a past expiry", () => {
     }),
     false,
   );
-  assert.strictEqual(isExpired({ ...grant, expiresAt: "not a date" }), false);
+  // Fail closed: an expiry we cannot read is not proof the grant is still good.
+  assert.strictEqual(isExpired({ ...grant, expiresAt: "not a date" }), true);
 });
 
 test("deleteCredentials reports whether a file was removed", () => {

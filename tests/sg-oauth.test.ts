@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import {
   CLIENT_METADATA_URL,
+  OAuthError,
   authorizeUrl,
   exchangeCode,
   generatePkce,
@@ -132,6 +133,8 @@ await test("the code callback refuses a wrong state, keeps listening and then de
   assert.strictEqual(wrongState.status, 400);
   const notFound = await get(`http://127.0.0.1:${server.port}/other`);
   assert.strictEqual(notFound.status, 404);
+  const noCode = await get(`${base}?state=STATE`);
+  assert.strictEqual(noCode.status, 400);
   const good = await get(`${base}?code=SEALED&state=STATE`);
   assert.strictEqual(good.status, 200);
   assert.ok(!good.body.includes("SEALED"), "the page must not echo the code");
@@ -148,6 +151,21 @@ await test("the code callback cancels on access_denied", async () => {
     server.result,
     (err: unknown) => err instanceof LoginError && err.code === "cancelled",
   );
+});
+
+await test("the code callback surfaces an authorization error that is not a cancellation", async () => {
+  const server = await startCodeCallbackServer("S3");
+  const res = await get(
+    `http://127.0.0.1:${server.port}/callback?error=invalid_target&error_description=unknown%20resource&state=S3`,
+  );
+  assert.strictEqual(res.status, 200);
+  await assert.rejects(server.result, (err: unknown) => {
+    assert.ok(err instanceof OAuthError, "expected an OAuthError");
+    assert.strictEqual(err.error, "invalid_target");
+    assert.strictEqual(err.description, "unknown resource");
+    assert.strictEqual(err.message, "invalid_target: unknown resource");
+    return true;
+  });
 });
 
 await test("exchangeCode posts a form and maps the response", async () => {
@@ -219,16 +237,58 @@ await test("exchangeCode omits expiresIn for a grant without an expiry", async (
 
 await test("exchangeCode surfaces an OAuth error", async () => {
   const fetchImpl = (async () =>
-    new Response(JSON.stringify({ error: "invalid_grant" }), {
-      status: 400,
-    })) as unknown as typeof fetch;
+    new Response(
+      JSON.stringify({
+        error: "invalid_grant",
+        error_description: "the code has expired",
+      }),
+      { status: 400 },
+    )) as unknown as typeof fetch;
   await assert.rejects(
     exchangeCode(
       "https://x/api/v1",
       { code: "c", verifier: "v", clientId: "i", redirectUri: "r" },
       fetchImpl,
     ),
-    /invalid_grant/,
+    (err: unknown) => {
+      assert.ok(err instanceof OAuthError, "expected an OAuthError");
+      assert.strictEqual(err.error, "invalid_grant");
+      assert.strictEqual(err.message, "invalid_grant: the code has expired");
+      return true;
+    },
+  );
+});
+
+await test("exchangeCode rejects a response without a usable token or organization", async () => {
+  const noToken = (async () =>
+    new Response("nope", { status: 500 })) as unknown as typeof fetch;
+  await assert.rejects(
+    exchangeCode(
+      "https://x/api/v1",
+      { code: "c", verifier: "v", clientId: "i", redirectUri: "r" },
+      noToken,
+    ),
+    (err: unknown) =>
+      err instanceof OAuthError && err.error === "invalid_response",
+  );
+  const badOrg = (async () =>
+    new Response(
+      JSON.stringify({
+        access_token: "sgm_x",
+        token_type: "Bearer",
+        org: "../evil",
+        roles: [],
+      }),
+      { status: 200 },
+    )) as unknown as typeof fetch;
+  await assert.rejects(
+    exchangeCode(
+      "https://x/api/v1",
+      { code: "c", verifier: "v", clientId: "i", redirectUri: "r" },
+      badOrg,
+    ),
+    (err: unknown) =>
+      err instanceof OAuthError && err.error === "invalid_response",
   );
 });
 
@@ -314,6 +374,11 @@ await test("loginViaGrant hands the authorization URL to the caller and times ou
     /^http:\/\/127\.0\.0\.1:\d+\/callback$/,
   );
   assert.match(url.searchParams.get("state") ?? "", /^[A-Za-z0-9_-]{16,}$/);
+  const redirect = new URL(url.searchParams.get("redirect_uri") ?? "");
+  await assert.rejects(
+    get(`${redirect.origin}/callback`),
+    "the callback server must be closed once the login gave up",
+  );
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

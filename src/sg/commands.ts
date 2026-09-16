@@ -112,11 +112,12 @@ function shortenHome(path: string): string {
   return home && path.startsWith(home) ? `~${path.slice(home.length)}` : path;
 }
 
-/** `expires <date>`, `expired <date>`, or `no expiry`. */
+/** `expires <date>`, `expired <date>`, `no expiry`, or `invalid expiry`. */
 function grantValidity(credentials: SgCredentials): string {
   if (!credentials.expiresAt) return "no expiry";
-  const when = new Date(credentials.expiresAt).toLocaleString();
-  return `${isExpired(credentials) ? "expired" : "expires"} ${when}`;
+  const at = Date.parse(credentials.expiresAt);
+  if (!Number.isFinite(at)) return "invalid expiry";
+  return `${isExpired(credentials) ? "expired" : "expires"} ${new Date(at).toLocaleString()}`;
 }
 
 async function chooseRegion(): Promise<string> {
@@ -296,6 +297,12 @@ async function resolveGrantEnvironment(
 async function credentialsFromGrant(
   options: SgAuthOptions,
 ): Promise<SgCredentials> {
+  if (options.token ?? envVar("SG_API_KEY")) {
+    fail(
+      "--token (or SG_API_KEY) cannot be used with --auth grant.",
+      "Drop it to approve a grant in the browser, or pass --auth apikey to use the key.",
+    );
+  }
   if (options.org && !isValidOrg(options.org)) {
     fail(`Invalid organization name: ${options.org}`);
   }
@@ -360,9 +367,10 @@ async function credentialsFromGrant(
     obtainedAt: new Date().toISOString(),
     authType: "grant",
     accessToken: result.accessToken,
-    expiresAt: result.expiresIn
-      ? new Date(Date.now() + result.expiresIn * 1000).toISOString()
-      : null,
+    expiresAt:
+      typeof result.expiresIn === "number"
+        ? new Date(Date.now() + result.expiresIn * 1000).toISOString()
+        : null,
   };
   const path = writeCredentials(credentials);
   p.log.info(`Credentials saved to ${shortenHome(path)}`);
@@ -381,8 +389,9 @@ export async function resolveCredentials(
   if (token) return credentialsFromToken(options, token);
 
   if (!forceLogin) {
+    // A grant belongs to --auth grant: apikey mode signs in for its own key.
     const saved = readCredentials();
-    if (saved && !isExpired(saved)) {
+    if (saved && saved.authType === "apikey" && !isExpired(saved)) {
       let requestedOrigin: string | undefined;
       if (options.dashboardUrl) {
         try {
@@ -650,6 +659,7 @@ export async function runLogout(
 ): Promise<void> {
   deps.showLogo();
   console.log();
+  const saved = readCredentials();
   const removed = deleteCredentials();
   p.log[removed ? "success" : "info"](
     removed
@@ -660,7 +670,9 @@ export async function runLogout(
     await runRemove({ ...options, yes: true }, deps, false);
   }
   p.outro(
-    "The API key itself stays valid; rotate it from Profile → API keys in the dashboard if needed.",
+    saved?.authType === "grant"
+      ? "The grant stays active until you revoke it from Profile → Connected apps."
+      : "The API key itself stays valid; rotate it from Profile → API keys in the dashboard if needed.",
   );
 }
 

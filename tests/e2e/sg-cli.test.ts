@@ -4,10 +4,12 @@ import { spawnSync } from "node:child_process";
 import {
   existsSync,
   lstatSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -335,6 +337,46 @@ test("preset-excluded agents and bad inputs fail clearly", () => {
   assert.notStrictEqual(noTty.status, 0);
   assert.match(`${noTty.stdout}\n${noTty.stderr}`, /--region/);
   assert.strictEqual(existsSync(join(freshHome, ".claude.json")), false);
+});
+
+test("a saved grant is shown by status but never reused as an API key", () => {
+  const home = createTempDir();
+  const project = createTempDir();
+  const dir = join(home, ".config", "add-sg-mcp");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    join(dir, "credentials.json"),
+    JSON.stringify({
+      version: 1,
+      current: {
+        apiBase: "https://api.app.stackguardian.io/api/v1",
+        dashboardUrl: "https://app.stackguardian.io",
+        org: "demo-org",
+        obtainedAt: "2026-09-16T12:00:00.000Z",
+        authType: "grant",
+        accessToken: "sgm_testtesttest1234",
+        expiresAt: "2099-01-01T00:00:00.000Z",
+      },
+    }),
+  );
+
+  const status = expectOk(runCli(["status"], project, home));
+  assert.match(status, /Grant token: sgm_…1234/);
+  assert.match(status, /Validity: expires/);
+
+  // Default (apikey) mode must ignore the grant and ask for a sign-in instead.
+  const connect = runCli(["-y", "--all"], project, home);
+  assert.notStrictEqual(connect.status, 0);
+  const output = `${connect.stdout}\n${connect.stderr}`;
+  assert.ok(
+    !output.includes("Using saved credentials"),
+    "a grant must not be reused as an API key",
+  );
+  assert.match(output, /--region/);
+  assert.strictEqual(existsSync(join(home, ".claude.json")), false);
+
+  const logout = expectOk(runCli(["logout"], project, home));
+  assert.match(logout, /Connected apps/);
 });
 
 test("--help is branded and lists the StackGuardian commands", () => {

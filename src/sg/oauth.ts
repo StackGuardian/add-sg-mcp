@@ -2,6 +2,21 @@ import http from "node:http";
 import { createHash, randomBytes } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { LoginError, callbackHtml, generateState, openUrl } from "./auth.js";
+import { isValidOrg } from "./preset.js";
+
+/**
+ * An OAuth `error` from the broker — on the callback or from the token
+ * endpoint. A user cancelling is a LoginError("cancelled") instead.
+ */
+export class OAuthError extends Error {
+  constructor(
+    public readonly error: string,
+    public readonly description?: string,
+  ) {
+    super(description ? `${error}: ${description}` : error);
+    this.name = "OAuthError";
+  }
+}
 
 /** What the broker hands back for `--auth grant`, plus where it came from. */
 export interface GrantResult {
@@ -115,12 +130,28 @@ export function startCodeCallbackServer(
       }
       const error = url.searchParams.get("error");
       if (error) {
-        respond(res, 200, "error", "Cancelled. You can close this tab.", () => {
-          settle?.reject(
-            new LoginError("cancelled", `Cancelled in the browser (${error})`),
-          );
-          close();
-        });
+        const cancelled = error === "access_denied";
+        const description =
+          url.searchParams.get("error_description") ?? undefined;
+        respond(
+          res,
+          200,
+          "error",
+          cancelled
+            ? "Cancelled. You can close this tab."
+            : "The authorization failed. Return to the terminal for the details.",
+          () => {
+            settle?.reject(
+              cancelled
+                ? new LoginError(
+                    "cancelled",
+                    `Cancelled in the browser (${error})`,
+                  )
+                : new OAuthError(error, description),
+            );
+            close();
+          },
+        );
         return;
       }
       const code = url.searchParams.get("code");
@@ -190,15 +221,28 @@ export async function exchangeCode(
   });
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok || typeof json.access_token !== "string") {
-    throw new Error(
-      `Token exchange failed: ${String(json.error ?? res.status)}${
-        json.error_description ? ` (${String(json.error_description)})` : ""
-      }`,
+    throw typeof json.error === "string"
+      ? new OAuthError(
+          json.error,
+          typeof json.error_description === "string"
+            ? json.error_description
+            : undefined,
+        )
+      : new OAuthError(
+          "invalid_response",
+          `the token endpoint answered HTTP ${res.status} without a token`,
+        );
+  }
+  const org = String(json.org ?? "");
+  if (!isValidOrg(org)) {
+    throw new OAuthError(
+      "invalid_response",
+      "the token endpoint returned an invalid organization",
     );
   }
   return {
     accessToken: json.access_token,
-    org: String(json.org ?? ""),
+    org,
     roles: Array.isArray(json.roles) ? json.roles.map(String) : [],
     ...(typeof json.expires_in === "number"
       ? { expiresIn: json.expires_in }
