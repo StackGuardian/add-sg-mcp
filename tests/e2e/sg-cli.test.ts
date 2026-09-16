@@ -373,6 +373,11 @@ test("a saved grant is shown by status but never reused as an API key", () => {
     "a grant must not be reused as an API key",
   );
   assert.match(output, /--region/);
+  assert.match(
+    output,
+    /Replacing the saved grant for demo-org; it stays active until revoked from Profile → Connected apps\./,
+  );
+  assert.ok(!output.includes("sgm_"), "the grant token must never be printed");
   assert.strictEqual(existsSync(join(home, ".claude.json")), false);
 
   const logout = expectOk(runCli(["logout"], project, home));

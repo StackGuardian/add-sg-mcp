@@ -259,6 +259,39 @@ await test("exchangeCode surfaces an OAuth error", async () => {
   );
 });
 
+await test("exchangeCode rejects an unusable expires_in", async () => {
+  const withExpiry = (value: unknown) =>
+    (async () =>
+      new Response(
+        JSON.stringify({
+          access_token: "sgm_x",
+          token_type: "Bearer",
+          org: "demo-org",
+          roles: [],
+          expires_in: value,
+        }),
+        { status: 200 },
+      )) as unknown as typeof fetch;
+  for (const bad of [1e300, -1, "3600"]) {
+    await assert.rejects(
+      exchangeCode(
+        QA_API,
+        { code: "c", verifier: "v", clientId: "i", redirectUri: "r" },
+        withExpiry(bad),
+      ),
+      (err: unknown) =>
+        err instanceof OAuthError && err.error === "invalid_response",
+      `expires_in ${String(bad)} must be refused`,
+    );
+  }
+  const ok = await exchangeCode(
+    QA_API,
+    { code: "c", verifier: "v", clientId: "i", redirectUri: "r" },
+    withExpiry(0),
+  );
+  assert.strictEqual(ok.expiresIn, 0);
+});
+
 await test("exchangeCode rejects a response without a usable token or organization", async () => {
   const noToken = (async () =>
     new Response("nope", { status: 500 })) as unknown as typeof fetch;

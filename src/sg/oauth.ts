@@ -37,6 +37,8 @@ export const CLIENT_METADATA_URL = (dashboardUrl: string): string =>
   `${dashboardUrl.trim().replace(/\/+$/, "")}/.well-known/oauth-clients/add-sg-mcp.json`;
 
 const DEFAULT_TIMEOUT_MS = 300_000;
+/** A grant may not outlive ten years; anything beyond that is a broken response. */
+const MAX_EXPIRES_IN_SECONDS = 10 * 365 * 86_400;
 
 function trimBase(apiBase: string): string {
   return apiBase.trim().replace(/\/+$/, "");
@@ -240,13 +242,25 @@ export async function exchangeCode(
       "the token endpoint returned an invalid organization",
     );
   }
+  const expiresIn = json.expires_in;
+  const hasExpiry = expiresIn !== undefined && expiresIn !== null;
+  if (
+    hasExpiry &&
+    (typeof expiresIn !== "number" ||
+      !Number.isFinite(expiresIn) ||
+      expiresIn < 0 ||
+      expiresIn > MAX_EXPIRES_IN_SECONDS)
+  ) {
+    throw new OAuthError(
+      "invalid_response",
+      "the token endpoint returned an unusable expires_in",
+    );
+  }
   return {
     accessToken: json.access_token,
     org,
     roles: Array.isArray(json.roles) ? json.roles.map(String) : [],
-    ...(typeof json.expires_in === "number"
-      ? { expiresIn: json.expires_in }
-      : {}),
+    ...(hasExpiry ? { expiresIn: expiresIn as number } : {}),
   };
 }
 

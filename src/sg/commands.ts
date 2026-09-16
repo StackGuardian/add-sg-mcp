@@ -414,6 +414,12 @@ export async function resolveCredentials(
       }
     }
   }
+  const grant = readCredentials();
+  if (grant?.authType === "grant" && !isExpired(grant)) {
+    p.log.warn(
+      `Replacing the saved grant for ${chalk.cyan(grant.org)}; it stays active until revoked from Profile → Connected apps.`,
+    );
+  }
   return credentialsFromBrowser(options);
 }
 

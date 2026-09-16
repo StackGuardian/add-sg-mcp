@@ -125,6 +125,18 @@ test("a grant credential without a token reads as null", () => {
   assert.strictEqual(readCredentials(), null);
 });
 
+test("a grant with an unreadable expiry reads as null", () => {
+  const home = setupConfigHome();
+  mkdirSync(join(home, "add-sg-mcp"), { recursive: true });
+  for (const expiresAt of [12345, "", { at: 1 }]) {
+    writeFileSync(
+      join(home, "add-sg-mcp", "credentials.json"),
+      JSON.stringify({ version: 1, current: { ...grant, expiresAt } }),
+    );
+    assert.strictEqual(readCredentials(), null, JSON.stringify(expiresAt));
+  }
+});
+
 test("a file written before grants reads back as an apikey credential", () => {
   const home = setupConfigHome();
   mkdirSync(join(home, "add-sg-mcp"), { recursive: true });

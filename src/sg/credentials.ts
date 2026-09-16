@@ -82,20 +82,21 @@ export function readCredentials(): SgCredentials | null {
     const value = current[field];
     if (typeof value !== "string" || value.length === 0) return null;
   }
-  return {
+  const common = {
     apiBase: current.apiBase,
     dashboardUrl: current.dashboardUrl,
     org: current.org,
     obtainedAt: current.obtainedAt,
-    authType,
-    ...(authType === "grant"
-      ? {
-          accessToken: secret,
-          expiresAt:
-            typeof current.expiresAt === "string" ? current.expiresAt : null,
-        }
-      : { apiKey: secret }),
   };
+  if (authType === "apikey") {
+    return { ...common, authType, apiKey: secret };
+  }
+  const expiresAt = current.expiresAt ?? null;
+  // An expiry we cannot read is not proof the grant is still good: refuse the file.
+  if (expiresAt !== null && (typeof expiresAt !== "string" || !expiresAt)) {
+    return null;
+  }
+  return { ...common, authType, accessToken: secret, expiresAt };
 }
 
 /** Writes the file with owner-only permissions; returns its path. */
