@@ -18,8 +18,15 @@ export interface SgCredentials {
   apiBase: string;
   dashboardUrl: string;
   org: string;
-  apiKey: string;
   obtainedAt: string;
+  /** `apikey` is the sgu_ key from the dashboard, `grant` the sgm_ token from the OAuth broker. */
+  authType: "apikey" | "grant";
+  /** Set for `apikey`. */
+  apiKey?: string;
+  /** Set for `grant`. */
+  accessToken?: string;
+  /** ISO expiry of a grant, or null when it never expires. */
+  expiresAt?: string | null;
 }
 
 interface CredentialsFile {
@@ -43,9 +50,15 @@ const FIELDS: (keyof SgCredentials)[] = [
   "apiBase",
   "dashboardUrl",
   "org",
-  "apiKey",
   "obtainedAt",
 ];
+
+/** True once a grant has passed its expiry; an expired credential counts as absent. */
+export function isExpired(credentials: SgCredentials): boolean {
+  if (!credentials.expiresAt) return false;
+  const at = Date.parse(credentials.expiresAt);
+  return Number.isFinite(at) && at <= Date.now();
+}
 
 export function readCredentials(): SgCredentials | null {
   let parsed: CredentialsFile;
@@ -58,17 +71,27 @@ export function readCredentials(): SgCredentials | null {
   }
   if (parsed?.version !== CURRENT_VERSION || !parsed.current) return null;
   const current = parsed.current;
+  // Files written before grants existed carry no authType and hold an API key.
+  const authType = current.authType === "grant" ? "grant" : "apikey";
+  const secret = authType === "grant" ? current.accessToken : current.apiKey;
+  if (typeof secret !== "string" || secret.length === 0) return null;
   for (const field of FIELDS) {
-    if (typeof current[field] !== "string" || current[field].length === 0) {
-      return null;
-    }
+    const value = current[field];
+    if (typeof value !== "string" || value.length === 0) return null;
   }
   return {
     apiBase: current.apiBase,
     dashboardUrl: current.dashboardUrl,
     org: current.org,
-    apiKey: current.apiKey,
     obtainedAt: current.obtainedAt,
+    authType,
+    ...(authType === "grant"
+      ? {
+          accessToken: secret,
+          expiresAt:
+            typeof current.expiresAt === "string" ? current.expiresAt : null,
+        }
+      : { apiKey: secret }),
   };
 }
 

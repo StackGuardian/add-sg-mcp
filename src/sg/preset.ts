@@ -1,4 +1,5 @@
 import type { AgentType } from "../types.js";
+import type { SgCredentials } from "./credentials.js";
 
 /** Prefix of the MCP server entry; the organization is appended so several orgs can coexist. */
 export const SG_SERVER_NAME_PREFIX = "StackGuardian";
@@ -124,8 +125,12 @@ export function buildMcpUrl(apiBase: string, org: string): string {
   return `${normalizeApiBase(apiBase)}/orgs/${encodeURIComponent(org)}/mcp/`;
 }
 
-export function buildAuthHeader(apiKey: string): string {
-  return `Authorization: apikey ${apiKey}`;
+export function buildAuthHeader(
+  credentials: Pick<SgCredentials, "authType" | "apiKey" | "accessToken">,
+): string {
+  return credentials.authType === "grant"
+    ? `Authorization: Bearer ${credentials.accessToken}`
+    : `Authorization: apikey ${credentials.apiKey}`;
 }
 
 export function maskKey(key: string): string {

@@ -136,10 +136,14 @@ test("org, state and key validation", () => {
   assert.strictEqual(isValidApiKey("sgu_has space aaaaaaaaaaaaa"), false);
 });
 
-test("buildAuthHeader uses the apikey scheme", () => {
+test("buildAuthHeader picks the scheme from the credential", () => {
   assert.strictEqual(
-    buildAuthHeader("sgu_abc"),
+    buildAuthHeader({ authType: "apikey", apiKey: "sgu_abc" }),
     "Authorization: apikey sgu_abc",
+  );
+  assert.strictEqual(
+    buildAuthHeader({ authType: "grant", accessToken: "sgm_abc" }),
+    "Authorization: Bearer sgm_abc",
   );
 });
 
