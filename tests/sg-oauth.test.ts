@@ -68,6 +68,8 @@ function startTokenServer(
 const QA_API = "https://testapi.qa.stackguardian.io/api/v1";
 const QA_DASHBOARD = "https://dash.qa.stackguardian.io";
 const CLIENT_ID = `${QA_DASHBOARD}/.well-known/oauth-clients/add-sg-mcp.json`;
+const TOKEN = "sgm_testtesttest1234";
+const REQ = { code: "c", verifier: "v", clientId: "i", redirectUri: "r" };
 
 await test("the client identity is the hosted metadata document URL", async () => {
   assert.strictEqual(CLIENT_METADATA_URL(QA_DASHBOARD), CLIENT_ID);
@@ -174,7 +176,7 @@ await test("exchangeCode posts a form and maps the response", async () => {
     calls.push({ url, body: String(init.body) });
     return new Response(
       JSON.stringify({
-        access_token: "sgm_x",
+        access_token: TOKEN,
         token_type: "Bearer",
         org: "demo-org",
         roles: ["DEV"],
@@ -207,7 +209,7 @@ await test("exchangeCode posts a form and maps the response", async () => {
     "http://127.0.0.1:5000/callback",
   );
   assert.deepStrictEqual(result, {
-    accessToken: "sgm_x",
+    accessToken: TOKEN,
     org: "demo-org",
     roles: ["DEV"],
     expiresIn: 3600,
@@ -218,7 +220,7 @@ await test("exchangeCode omits expiresIn for a grant without an expiry", async (
   const fetchImpl = (async () =>
     new Response(
       JSON.stringify({
-        access_token: "sgm_x",
+        access_token: TOKEN,
         token_type: "Bearer",
         org: "demo-org",
         roles: [],
@@ -231,7 +233,7 @@ await test("exchangeCode omits expiresIn for a grant without an expiry", async (
       { code: "c", verifier: "v", clientId: "i", redirectUri: "r" },
       fetchImpl,
     ),
-    { accessToken: "sgm_x", org: "demo-org", roles: [] },
+    { accessToken: TOKEN, org: "demo-org", roles: [] },
   );
 });
 
@@ -259,12 +261,63 @@ await test("exchangeCode surfaces an OAuth error", async () => {
   );
 });
 
+await test("exchangeCode rejects a token or a token_type it cannot use", async () => {
+  const answer = (extra: Record<string, unknown>) =>
+    (async () =>
+      new Response(
+        JSON.stringify({
+          access_token: TOKEN,
+          token_type: "Bearer",
+          org: "demo-org",
+          roles: [],
+          ...extra,
+        }),
+        { status: 200 },
+      )) as unknown as typeof fetch;
+  for (const extra of [
+    { access_token: "sgm_short" },
+    { access_token: "sgm_has space aaaaaaaaaaaa" },
+    { token_type: "mac" },
+    { token_type: undefined },
+  ]) {
+    await assert.rejects(
+      exchangeCode(QA_API, REQ, answer(extra)),
+      (err: unknown) =>
+        err instanceof OAuthError && err.error === "invalid_response",
+      JSON.stringify(extra),
+    );
+  }
+  const lowercase = await exchangeCode(
+    QA_API,
+    REQ,
+    answer({ token_type: "bearer" }),
+  );
+  assert.strictEqual(lowercase.accessToken, TOKEN);
+});
+
+await test("exchangeCode gives up when the token endpoint never answers", async () => {
+  const hanging = http.createServer(() => {});
+  await new Promise<void>((resolve) =>
+    hanging.listen(0, "127.0.0.1", () => resolve()),
+  );
+  const { port } = hanging.address() as AddressInfo;
+  try {
+    await assert.rejects(
+      exchangeCode(`http://127.0.0.1:${port}/api/v1`, REQ, fetch, 200),
+      (err: unknown) => err instanceof LoginError && err.code === "timeout",
+    );
+  } finally {
+    hanging.closeAllConnections?.();
+    hanging.close();
+  }
+});
+
 await test("exchangeCode rejects an unusable expires_in", async () => {
   const withExpiry = (value: unknown) =>
     (async () =>
       new Response(
         JSON.stringify({
-          access_token: "sgm_x",
+          access_token: TOKEN,
           token_type: "Bearer",
           org: "demo-org",
           roles: [],
@@ -307,7 +360,7 @@ await test("exchangeCode rejects a response without a usable token or organizati
   const badOrg = (async () =>
     new Response(
       JSON.stringify({
-        access_token: "sgm_x",
+        access_token: TOKEN,
         token_type: "Bearer",
         org: "../evil",
         roles: [],
@@ -332,7 +385,7 @@ await test("loginViaGrant runs the whole flow and returns the grant", async () =
     return {
       status: 200,
       body: {
-        access_token: "sgm_token",
+        access_token: TOKEN,
         token_type: "Bearer",
         org: "demo-org",
         roles: ["DEV"],
@@ -358,7 +411,7 @@ await test("loginViaGrant runs the whole flow and returns the grant", async () =
       },
     });
     assert.deepStrictEqual(result, {
-      accessToken: "sgm_token",
+      accessToken: TOKEN,
       org: "demo-org",
       roles: ["DEV"],
       expiresIn: 3600,

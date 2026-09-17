@@ -278,13 +278,12 @@ async function resolveGrantEnvironment(
   options: SgAuthOptions,
 ): Promise<{ apiBase: string; dashboardUrl: string }> {
   const { dashboardUrl } = await resolveDashboard(options);
-  if (options.apiBase) {
-    if (!isAllowedApiBase(options.apiBase, ["localhost", "127.0.0.1"])) {
-      fail(
-        `--api-base must be an https StackGuardian host, got ${options.apiBase}`,
-      );
+  const apiBase = options.apiBase ?? envVar("SG_API_BASE");
+  if (apiBase) {
+    if (!isAllowedApiBase(apiBase, ["localhost", "127.0.0.1"])) {
+      fail(`--api-base must be an https StackGuardian host, got ${apiBase}`);
     }
-    return { apiBase: normalizeApiBase(options.apiBase), dashboardUrl };
+    return { apiBase: normalizeApiBase(apiBase), dashboardUrl };
   }
   const env = SG_ENVIRONMENTS.find((e) => e.dashboardUrl === dashboardUrl);
   if (!env) {
@@ -296,6 +295,7 @@ async function resolveGrantEnvironment(
 /** A grant token from the StackGuardian OAuth broker (authorization code + PKCE). */
 async function credentialsFromGrant(
   options: SgAuthOptions,
+  forceLogin = false,
 ): Promise<SgCredentials> {
   if (options.token ?? envVar("SG_API_KEY")) {
     fail(
@@ -307,7 +307,7 @@ async function credentialsFromGrant(
     fail(`Invalid organization name: ${options.org}`);
   }
   const { apiBase, dashboardUrl } = await resolveGrantEnvironment(options);
-  const saved = readCredentials();
+  const saved = forceLogin ? null : readCredentials();
   if (
     saved &&
     saved.authType === "grant" &&
@@ -388,36 +388,33 @@ export async function resolveCredentials(
   const token = options.token ?? envVar("SG_API_KEY");
   if (token) return credentialsFromToken(options, token);
 
-  if (!forceLogin) {
-    // A grant belongs to --auth grant: apikey mode signs in for its own key.
-    const saved = readCredentials();
-    if (saved && saved.authType === "apikey" && !isExpired(saved)) {
-      let requestedOrigin: string | undefined;
-      if (options.dashboardUrl) {
-        try {
-          requestedOrigin = new URL(options.dashboardUrl).origin;
-        } catch {
-          fail(`--dashboard-url is not a URL: ${options.dashboardUrl}`);
-        }
-      }
-      const orgMatches = !options.org || options.org === saved.org;
-      const envMatches =
-        (!options.region ||
-          environmentForRegion(options.region)?.dashboardUrl ===
-            saved.dashboardUrl) &&
-        (!requestedOrigin || requestedOrigin === saved.dashboardUrl);
-      if (orgMatches && envMatches) {
-        p.log.info(
-          `Using saved credentials for ${chalk.cyan(saved.org)} (${saved.dashboardUrl || saved.apiBase}). Run ${chalk.cyan("add-sg-mcp login")} to switch.`,
-        );
-        return saved;
+  // A grant belongs to --auth grant: apikey mode signs in for its own key.
+  const saved = readCredentials();
+  if (!forceLogin && saved?.authType === "apikey" && !isExpired(saved)) {
+    let requestedOrigin: string | undefined;
+    if (options.dashboardUrl) {
+      try {
+        requestedOrigin = new URL(options.dashboardUrl).origin;
+      } catch {
+        fail(`--dashboard-url is not a URL: ${options.dashboardUrl}`);
       }
     }
+    const orgMatches = !options.org || options.org === saved.org;
+    const envMatches =
+      (!options.region ||
+        environmentForRegion(options.region)?.dashboardUrl ===
+          saved.dashboardUrl) &&
+      (!requestedOrigin || requestedOrigin === saved.dashboardUrl);
+    if (orgMatches && envMatches) {
+      p.log.info(
+        `Using saved credentials for ${chalk.cyan(saved.org)} (${saved.dashboardUrl || saved.apiBase}). Run ${chalk.cyan("add-sg-mcp login")} to switch.`,
+      );
+      return saved;
+    }
   }
-  const grant = readCredentials();
-  if (grant?.authType === "grant" && !isExpired(grant)) {
+  if (saved?.authType === "grant" && !isExpired(saved)) {
     p.log.warn(
-      `Replacing the saved grant for ${chalk.cyan(grant.org)}; it stays active until revoked from Profile → Connected apps.`,
+      `The saved grant for ${chalk.cyan(saved.org)} will be replaced; it stays active until you revoke it from Profile → Connected apps.`,
     );
   }
   return credentialsFromBrowser(options);
@@ -648,14 +645,20 @@ export async function runConnect(
 }
 
 export async function runLogin(
-  options: SgAuthOptions,
+  options: SgConnectOptions,
   deps: SgCommandDeps,
 ): Promise<void> {
   deps.showLogo();
   console.log();
-  const credentials = await resolveCredentials(options, true);
+  // login always signs in afresh, so a grant login always asks for consent again.
+  const grant = (options.auth ?? "").toLowerCase() === "grant";
+  const credentials = grant
+    ? await credentialsFromGrant(options, true)
+    : await resolveCredentials(options, true);
   p.outro(
-    `Signed in to ${chalk.cyan(credentials.org)}. Run ${chalk.cyan("add-sg-mcp")} to install the server and skills.`,
+    grant
+      ? `Grant saved for ${chalk.cyan(credentials.org)}. Run ${chalk.cyan("add-sg-mcp --auth grant")} to install the server and skills.`
+      : `Signed in to ${chalk.cyan(credentials.org)}. Run ${chalk.cyan("add-sg-mcp")} to install the server and skills.`,
   );
 }
 
@@ -838,7 +841,7 @@ function addAuthOptions(command: Command): Command {
     )
     .option(
       "--api-base <url>",
-      "API base for --token, e.g. https://api.app.stackguardian.io/api/v1",
+      "API base for --token or --auth grant, e.g. https://api.app.stackguardian.io/api/v1",
     )
     .option(
       "--no-browser",
@@ -872,7 +875,7 @@ export function registerSgCommands(
         "Sign in through the StackGuardian dashboard and save the credential",
       ),
   ).action(async (_options: SgAuthOptions, command: Command) => {
-    await runLogin(command.optsWithGlobals() as SgAuthOptions, deps);
+    await runLogin(command.optsWithGlobals() as SgConnectOptions, deps);
   });
 
   program

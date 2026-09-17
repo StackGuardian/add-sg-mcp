@@ -339,9 +339,9 @@ test("preset-excluded agents and bad inputs fail clearly", () => {
   assert.strictEqual(existsSync(join(freshHome, ".claude.json")), false);
 });
 
-test("a saved grant is shown by status but never reused as an API key", () => {
-  const home = createTempDir();
-  const project = createTempDir();
+const GRANT = "sgm_testtesttest1234";
+
+function writeGrant(home: string, expiresAt: string | null): void {
   const dir = join(home, ".config", "add-sg-mcp");
   mkdirSync(dir, { recursive: true });
   writeFileSync(
@@ -354,11 +354,17 @@ test("a saved grant is shown by status but never reused as an API key", () => {
         org: "demo-org",
         obtainedAt: "2026-09-16T12:00:00.000Z",
         authType: "grant",
-        accessToken: "sgm_testtesttest1234",
-        expiresAt: "2099-01-01T00:00:00.000Z",
+        accessToken: GRANT,
+        expiresAt,
       },
     }),
   );
+}
+
+test("a saved grant is shown by status but never reused as an API key", () => {
+  const home = createTempDir();
+  const project = createTempDir();
+  writeGrant(home, "2099-01-01T00:00:00.000Z");
 
   const status = expectOk(runCli(["status"], project, home));
   assert.match(status, /Grant token: sgm_…1234/);
@@ -375,13 +381,108 @@ test("a saved grant is shown by status but never reused as an API key", () => {
   assert.match(output, /--region/);
   assert.match(
     output,
-    /Replacing the saved grant for demo-org; it stays active until revoked from Profile → Connected apps\./,
+    /The saved grant for demo-org will be replaced; it stays active until you revoke it from Profile → Connected apps\./,
   );
   assert.ok(!output.includes("sgm_"), "the grant token must never be printed");
   assert.strictEqual(existsSync(join(home, ".claude.json")), false);
 
   const logout = expectOk(runCli(["logout"], project, home));
   assert.match(logout, /Connected apps/);
+});
+
+test("--auth grant installs a live grant as a Bearer header and re-logs in when it expired", () => {
+  const home = createTempDir();
+  const project = createTempDir();
+  writeGrant(home, "2099-01-01T00:00:00.000Z");
+  const output = expectOk(
+    runCli(
+      [
+        "--auth",
+        "grant",
+        "--region",
+        "eu",
+        "-y",
+        "-a",
+        "claude-code",
+        "--skip-skills",
+      ],
+      project,
+      home,
+    ),
+  );
+  assert.match(output, /Using the saved grant for demo-org/);
+  const claude = JSON.parse(
+    readFileSync(join(home, ".claude.json"), "utf-8"),
+  ) as {
+    mcpServers: Record<
+      string,
+      { url: string; headers: Record<string, string> }
+    >;
+  };
+  assert.strictEqual(claude.mcpServers[NAME]?.url, URL);
+  assert.strictEqual(
+    claude.mcpServers[NAME]?.headers?.Authorization,
+    `Bearer ${GRANT}`,
+  );
+
+  const stale = createTempDir();
+  writeGrant(stale, "2020-01-01T00:00:00.000Z");
+  const expired = runCli(
+    [
+      "--auth",
+      "grant",
+      "--region",
+      "eu",
+      "-y",
+      "-a",
+      "claude-code",
+      "--skip-skills",
+      "--no-browser",
+      "--login-timeout",
+      "1",
+    ],
+    project,
+    stale,
+  );
+  const expiredOutput = `${expired.stdout}\n${expired.stderr}`;
+  assert.ok(
+    !expiredOutput.includes("Using the saved grant"),
+    "an expired grant must not be reused",
+  );
+  assert.match(expiredOutput, /\/oauth\/authorize\?/);
+  assert.notStrictEqual(expired.status, 0);
+  assert.strictEqual(existsSync(join(stale, ".claude.json")), false);
+});
+
+test("login --auth grant asks the broker, not the cli-connect page", () => {
+  const home = createTempDir();
+  const project = createTempDir();
+  const result = runCli(
+    [
+      "login",
+      "--auth",
+      "grant",
+      "--region",
+      "eu",
+      "--no-browser",
+      "--login-timeout",
+      "1",
+    ],
+    project,
+    home,
+  );
+  const output = `${result.stdout}\n${result.stderr}`;
+  assert.match(output, /\/oauth\/authorize\?/);
+  assert.match(output, /code_challenge=/);
+  assert.ok(
+    !output.includes("cli-connect"),
+    "the API-key connect page must not be used for a grant login",
+  );
+  assert.notStrictEqual(result.status, 0);
+  assert.strictEqual(
+    existsSync(join(home, ".config", "add-sg-mcp", "credentials.json")),
+    false,
+  );
 });
 
 test("--help is branded and lists the StackGuardian commands", () => {

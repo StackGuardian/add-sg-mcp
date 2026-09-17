@@ -2,7 +2,7 @@ import http from "node:http";
 import { createHash, randomBytes } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { LoginError, callbackHtml, generateState, openUrl } from "./auth.js";
-import { isValidOrg } from "./preset.js";
+import { isValidApiKey, isValidOrg } from "./preset.js";
 
 /**
  * An OAuth `error` from the broker — on the callback or from the token
@@ -39,6 +39,7 @@ export const CLIENT_METADATA_URL = (dashboardUrl: string): string =>
 const DEFAULT_TIMEOUT_MS = 300_000;
 /** A grant may not outlive ten years; anything beyond that is a broken response. */
 const MAX_EXPIRES_IN_SECONDS = 10 * 365 * 86_400;
+const TOKEN_TIMEOUT_MS = 30_000;
 
 function trimBase(apiBase: string): string {
   return apiBase.trim().replace(/\/+$/, "");
@@ -200,11 +201,20 @@ export interface TokenResult {
   expiresIn?: number;
 }
 
+function isAborted(error: unknown): boolean {
+  const named = error as { name?: string; cause?: { name?: string } };
+  for (const name of [named?.name, named?.cause?.name]) {
+    if (name === "TimeoutError" || name === "AbortError") return true;
+  }
+  return false;
+}
+
 /** Back-channel exchange; the code and the verifier never touch the browser together. */
 export async function exchangeCode(
   apiBase: string,
   p: TokenRequest,
   fetchImpl: typeof fetch = fetch,
+  timeoutMs: number = TOKEN_TIMEOUT_MS,
 ): Promise<TokenResult> {
   const body = new URLSearchParams({
     grant_type: "authorization_code",
@@ -213,14 +223,26 @@ export async function exchangeCode(
     client_id: p.clientId,
     redirect_uri: p.redirectUri,
   });
-  const res = await fetchImpl(`${trimBase(apiBase)}/oauth/token`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/x-www-form-urlencoded",
-      accept: "application/json",
-    },
-    body: body.toString(),
-  });
+  let res: Response;
+  try {
+    res = await fetchImpl(`${trimBase(apiBase)}/oauth/token`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        accept: "application/json",
+      },
+      body: body.toString(),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error) {
+    if (isAborted(error)) {
+      throw new LoginError(
+        "timeout",
+        `The token endpoint did not answer within ${Math.max(1, Math.round(timeoutMs / 1000))}s.`,
+      );
+    }
+    throw error;
+  }
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok || typeof json.access_token !== "string") {
     throw typeof json.error === "string"
@@ -234,6 +256,15 @@ export async function exchangeCode(
           "invalid_response",
           `the token endpoint answered HTTP ${res.status} without a token`,
         );
+  }
+  if (
+    !isValidApiKey(json.access_token) ||
+    String(json.token_type ?? "").toLowerCase() !== "bearer"
+  ) {
+    throw new OAuthError(
+      "invalid_response",
+      "the token endpoint returned an unusable token",
+    );
   }
   const org = String(json.org ?? "");
   if (!isValidOrg(org)) {
