@@ -64,7 +64,8 @@ export interface AuthorizeParams {
 
 export function authorizeUrl(apiBase: string, p: AuthorizeParams): string {
   const base = trimBase(apiBase);
-  const url = new URL(`${base}/oauth/authorize`);
+  // Trailing slash required: the gateway authorizer only allows the slash form of public routes.
+  const url = new URL(`${base}/oauth/authorize/`);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("client_id", p.clientId);
   url.searchParams.set("redirect_uri", p.redirectUri);
@@ -225,7 +226,7 @@ export async function exchangeCode(
   });
   let res: Response;
   try {
-    res = await fetchImpl(`${trimBase(apiBase)}/oauth/token`, {
+    res = await fetchImpl(`${trimBase(apiBase)}/oauth/token/`, {
       method: "POST",
       headers: {
         "content-type": "application/x-www-form-urlencoded",

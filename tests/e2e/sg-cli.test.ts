@@ -450,7 +450,7 @@ test("--auth grant installs a live grant as a Bearer header and re-logs in when 
     !expiredOutput.includes("Using the saved grant"),
     "an expired grant must not be reused",
   );
-  assert.match(expiredOutput, /\/oauth\/authorize\?/);
+  assert.match(expiredOutput, /\/oauth\/authorize\/\?/);
   assert.notStrictEqual(expired.status, 0);
   assert.strictEqual(existsSync(join(stale, ".claude.json")), false);
 });
@@ -473,7 +473,7 @@ test("login --auth grant asks the broker, not the cli-connect page", () => {
     home,
   );
   const output = `${result.stdout}\n${result.stderr}`;
-  assert.match(output, /\/oauth\/authorize\?/);
+  assert.match(output, /\/oauth\/authorize\/\?/);
   assert.match(output, /code_challenge=/);
   assert.ok(
     !output.includes("cli-connect"),

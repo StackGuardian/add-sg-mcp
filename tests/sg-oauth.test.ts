@@ -41,12 +41,20 @@ function get(url: string): Promise<{ status: number; body: string }> {
   });
 }
 
-/** A stand-in for `<apiBase>/oauth/token` so the flow runs without mocking fetch. */
+/**
+ * A stand-in for `<apiBase>/oauth/token/` so the flow runs without mocking fetch.
+ * Like the real gateway, it only answers the trailing-slash form.
+ */
 function startTokenServer(
   handler: (form: URLSearchParams) => { status: number; body: unknown },
 ): Promise<{ apiBase: string; close: () => void }> {
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
+      if (req.url !== "/api/v1/oauth/token/") {
+        res.writeHead(403, { "content-type": "application/json" });
+        res.end(JSON.stringify({ msg: "Unauthorized" }));
+        return;
+      }
       let body = "";
       req.on("data", (chunk) => (body += chunk));
       req.on("end", () => {
@@ -98,7 +106,7 @@ await test("authorizeUrl carries the standard parameters and the MCP resource wh
   );
   assert.strictEqual(
     url.origin + url.pathname,
-    "https://testapi.qa.stackguardian.io/api/v1/oauth/authorize",
+    "https://testapi.qa.stackguardian.io/api/v1/oauth/authorize/",
   );
   assert.strictEqual(url.searchParams.get("response_type"), "code");
   assert.strictEqual(url.searchParams.get("client_id"), CLIENT_ID);
@@ -125,7 +133,7 @@ await test("authorizeUrl omits the resource when no org was chosen", async () =>
     }),
   );
   assert.strictEqual(url.searchParams.get("resource"), null);
-  assert.strictEqual(url.pathname, "/api/v1/oauth/authorize");
+  assert.strictEqual(url.pathname, "/api/v1/oauth/authorize/");
 });
 
 await test("the code callback refuses a wrong state, keeps listening and then delivers the code", async () => {
@@ -197,7 +205,7 @@ await test("exchangeCode posts a form and maps the response", async () => {
   );
   assert.strictEqual(
     calls[0]?.url,
-    "https://testapi.qa.stackguardian.io/api/v1/oauth/token",
+    "https://testapi.qa.stackguardian.io/api/v1/oauth/token/",
   );
   const form = new URLSearchParams(calls[0]?.body ?? "");
   assert.strictEqual(form.get("grant_type"), "authorization_code");
@@ -452,7 +460,7 @@ await test("loginViaGrant hands the authorization URL to the caller and times ou
     (err: unknown) => err instanceof LoginError && err.code === "timeout",
   );
   const url = new URL(seen);
-  assert.strictEqual(url.pathname, "/api/v1/oauth/authorize");
+  assert.strictEqual(url.pathname, "/api/v1/oauth/authorize/");
   assert.strictEqual(url.searchParams.get("client_id"), CLIENT_ID);
   assert.strictEqual(url.searchParams.get("resource"), null);
   assert.match(
