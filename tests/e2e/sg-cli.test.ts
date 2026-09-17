@@ -411,6 +411,7 @@ test("--auth grant installs a live grant as a Bearer header and re-logs in when 
     ),
   );
   assert.match(output, /Using the saved grant for demo-org/);
+  assert.ok(!output.includes("sgm_"), "the grant token must never be printed");
   const claude = JSON.parse(
     readFileSync(join(home, ".claude.json"), "utf-8"),
   ) as {
@@ -483,6 +484,38 @@ test("login --auth grant asks the broker, not the cli-connect page", () => {
     existsSync(join(home, ".config", "add-sg-mcp", "credentials.json")),
     false,
   );
+});
+
+test("login refuses an --auth mode it cannot run", () => {
+  const project = createTempDir();
+  for (const auth of ["oauth", "grnat"]) {
+    const home = createTempDir();
+    const result = runCli(
+      [
+        "login",
+        "--auth",
+        auth,
+        "--region",
+        "eu",
+        "--no-browser",
+        "--login-timeout",
+        "1",
+      ],
+      project,
+      home,
+    );
+    const output = `${result.stdout}\n${result.stderr}`;
+    assert.notStrictEqual(result.status, 0, auth);
+    assert.ok(
+      !output.includes("https://"),
+      `login --auth ${auth} must not open any sign-in page`,
+    );
+    assert.strictEqual(
+      existsSync(join(home, ".config", "add-sg-mcp", "credentials.json")),
+      false,
+      auth,
+    );
+  }
 });
 
 test("--help is branded and lists the StackGuardian commands", () => {

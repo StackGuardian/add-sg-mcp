@@ -650,8 +650,17 @@ export async function runLogin(
 ): Promise<void> {
   deps.showLogo();
   console.log();
+  const auth = (options.auth ?? "apikey").toLowerCase();
+  if (auth === "oauth") {
+    fail(
+      "login is not needed with --auth oauth: each agent signs in on first use",
+    );
+  }
+  if (auth !== "apikey" && auth !== "grant") {
+    fail(`--auth must be apikey, grant or oauth, got ${options.auth}`);
+  }
   // login always signs in afresh, so a grant login always asks for consent again.
-  const grant = (options.auth ?? "").toLowerCase() === "grant";
+  const grant = auth === "grant";
   const credentials = grant
     ? await credentialsFromGrant(options, true)
     : await resolveCredentials(options, true);

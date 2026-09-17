@@ -118,7 +118,7 @@ npx add-sg-mcp -a claude-code        # adds StackGuardian-other-org
 - With `--auth grant` the credential is a **grant token bound to one organization and the roles you approved**, and it can carry an expiry. Revoke it from _Profile → Connected apps_. In both cases `logout` only deletes the local copy — it never invalidates the credential.
 - By default nothing is written into project directories. `--project` warns and adds the generated files to `.gitignore`.
 - The CLI accepts a callback only when its one-time `state` matches, and only API hosts under `stackguardian.io` (or the host you passed with `--dashboard-url`).
-- `status` never prints the key or the grant token in full; the callback page strips the credential from the browser history, and a grant flow keeps its PKCE verifier and code off the front channel.
+- `status` never prints the key or the grant token in full; the callback page strips the credential from the browser history, and a grant flow keeps its PKCE verifier off the front channel (only the one-time code travels through the browser).
 
 ## Development
 
