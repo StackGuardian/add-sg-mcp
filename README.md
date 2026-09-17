@@ -55,6 +55,7 @@ npx add-sg-mcp [options]
   --no-browser               Print the sign-in link instead of opening a browser
   --login-timeout <seconds>  How long to wait for the browser (default 300)
   --dashboard-url <url>      Another dashboard (other environments, local dev)
+  --auth <apikey|grant|oauth> Credential mode (default apikey)
 ```
 
 Other commands:
@@ -90,6 +91,15 @@ npx add-sg-mcp -a claude-code        # adds StackGuardian-other-org
 
 `remove` and `logout --purge` take every `StackGuardian-<org>` entry out again (pass `--name` to remove just one).
 
+### Grant tokens (`--auth grant`)
+
+`npx add-sg-mcp --auth grant --region eu` (optionally `--org my-org`) asks the StackGuardian OAuth broker for a **grant token** instead of using your API key. The browser opens a consent page where you pick the organization, the roles the agent may use and how long the grant should last; the CLI receives an `sgm_` token on a loopback callback and writes it to each agent as an `Authorization: Bearer` header.
+
+- The token is bound to **one organization and the roles you approved** — it is not your full user key, so an agent can be given less than you have.
+- Expiry is yours to choose on the consent page. `add-sg-mcp status` shows `expires <date>`, `no expiry` or `expired`; an expired grant is never reused, the next run asks for a new one.
+- Revoke a grant any time from _Profile → Connected apps_ in the dashboard. `logout` only deletes the local copy.
+- `npx add-sg-mcp login --auth grant` requests a fresh grant without touching agent configs.
+
 ### OAuth (preview)
 
 `npx add-sg-mcp --auth oauth --org my-org --region eu` writes the server URL without a credential for agents that implement MCP OAuth themselves (Claude Code, VS Code, Cursor, Codex, Gemini CLI, Windsurf). The agent then signs you in on first use. This needs the StackGuardian OAuth broker to be enabled for your environment.
@@ -104,10 +114,11 @@ npx add-sg-mcp -a claude-code        # adds StackGuardian-other-org
 ## Security
 
 - On Windows there is no `0600` equivalent; the file relies on the ACL of your profile folder.
-- The credential is your **user API key for the selected organization**: it acts as you, with your roles, and it does not expire on its own. Rotate it from _Profile → API keys_ in the dashboard if a machine is lost; `logout` only deletes the local copy.
+- With `--auth apikey` (the default) the credential is your **user API key for the selected organization**: it acts as you, with your roles, and it does not expire on its own. Rotate it from _Profile → API keys_ in the dashboard if a machine is lost.
+- With `--auth grant` the credential is a **grant token bound to one organization and the roles you approved**, and it can carry an expiry. Revoke it from _Profile → Connected apps_. In both cases `logout` only deletes the local copy — it never invalidates the credential.
 - By default nothing is written into project directories. `--project` warns and adds the generated files to `.gitignore`.
 - The CLI accepts a callback only when its one-time `state` matches, and only API hosts under `stackguardian.io` (or the host you passed with `--dashboard-url`).
-- `status` never prints the key; the callback page strips the key from the browser history.
+- `status` never prints the key or the grant token in full; the callback page strips the credential from the browser history, and a grant flow keeps its PKCE verifier off the front channel (only the one-time code travels through the browser).
 
 ## Development
 

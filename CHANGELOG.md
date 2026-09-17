@@ -8,6 +8,7 @@ First release of `add-sg-mcp`, a StackGuardian-specific fork of `add-mcp` 2.4.0.
 - Installs the StackGuardian skills (`sg-create-workflow`, `sg-update-workflow`, `sg-upgrade-workflow`) into each agent's skills directory via a shared `~/.agents/skills` copy.
 - New commands: `login`, `logout [--purge]`, `status`, `remove`. Headless mode with `--token`/`SG_API_KEY`.
 - Default scope is the user profile; `--project` opts into project files and adds them to `.gitignore`.
+- `--auth grant` obtains an OAuth grant token (authorization code + PKCE) from the StackGuardian broker: you approve an organization, roles and an expiry in the browser, and each agent gets an `Authorization: Bearer sgm_…` header. `status` shows the expiry, an expired grant is never reused, and grants are revoked from _Profile → Connected apps_.
 - `--auth oauth` (preview) writes a credential-less entry for agents with built-in MCP OAuth.
 - Removed the registry site, `find`/`search`, `list` and `sync` commands from upstream.
 

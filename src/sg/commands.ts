@@ -32,11 +32,13 @@ import {
 import {
   deleteCredentials,
   getCredentialsPath,
+  isExpired,
   readCredentials,
   writeCredentials,
   type SgCredentials,
 } from "./credentials.js";
 import { LoginError, loginViaBrowser } from "./auth.js";
+import { loginViaGrant } from "./oauth.js";
 import {
   SG_SKILL_NAMES,
   installSkills,
@@ -108,6 +110,14 @@ function serverUrl(config: Record<string, unknown>): string {
 function shortenHome(path: string): string {
   const home = process.env.HOME || process.env.USERPROFILE;
   return home && path.startsWith(home) ? `~${path.slice(home.length)}` : path;
+}
+
+/** `expires <date>`, `expired <date>`, `no expiry`, or `invalid expiry`. */
+function grantValidity(credentials: SgCredentials): string {
+  if (!credentials.expiresAt) return "no expiry";
+  const at = Date.parse(credentials.expiresAt);
+  if (!Number.isFinite(at)) return "invalid expiry";
+  return `${isExpired(credentials) ? "expired" : "expires"} ${new Date(at).toLocaleString()}`;
 }
 
 async function chooseRegion(): Promise<string> {
@@ -192,8 +202,9 @@ async function credentialsFromToken(
     apiBase: normalizeApiBase(apiBase),
     dashboardUrl,
     org,
-    apiKey: token,
     obtainedAt: new Date().toISOString(),
+    authType: "apikey",
+    apiKey: token,
   };
   const path = writeCredentials(credentials);
   p.log.success(
@@ -253,8 +264,113 @@ async function credentialsFromBrowser(
     apiBase: result.apiBase,
     dashboardUrl,
     org: result.org,
-    apiKey: result.apiKey,
     obtainedAt: new Date().toISOString(),
+    authType: "apikey",
+    apiKey: result.apiKey,
+  };
+  const path = writeCredentials(credentials);
+  p.log.info(`Credentials saved to ${shortenHome(path)}`);
+  return credentials;
+}
+
+/** Both URLs must be known before the browser opens, so --dashboard-url needs --api-base. */
+async function resolveGrantEnvironment(
+  options: SgAuthOptions,
+): Promise<{ apiBase: string; dashboardUrl: string }> {
+  const { dashboardUrl } = await resolveDashboard(options);
+  const apiBase = options.apiBase ?? envVar("SG_API_BASE");
+  if (apiBase) {
+    if (!isAllowedApiBase(apiBase, ["localhost", "127.0.0.1"])) {
+      fail(`--api-base must be an https StackGuardian host, got ${apiBase}`);
+    }
+    return { apiBase: normalizeApiBase(apiBase), dashboardUrl };
+  }
+  const env = SG_ENVIRONMENTS.find((e) => e.dashboardUrl === dashboardUrl);
+  if (!env) {
+    fail("Pass --api-base together with --dashboard-url for --auth grant.");
+  }
+  return { apiBase: env.apiBase, dashboardUrl };
+}
+
+/** A grant token from the StackGuardian OAuth broker (authorization code + PKCE). */
+async function credentialsFromGrant(
+  options: SgAuthOptions,
+  forceLogin = false,
+): Promise<SgCredentials> {
+  if (options.token ?? envVar("SG_API_KEY")) {
+    fail(
+      "--token (or SG_API_KEY) cannot be used with --auth grant.",
+      "Drop it to approve a grant in the browser, or pass --auth apikey to use the key.",
+    );
+  }
+  if (options.org && !isValidOrg(options.org)) {
+    fail(`Invalid organization name: ${options.org}`);
+  }
+  const { apiBase, dashboardUrl } = await resolveGrantEnvironment(options);
+  const saved = forceLogin ? null : readCredentials();
+  if (
+    saved &&
+    saved.authType === "grant" &&
+    !isExpired(saved) &&
+    saved.apiBase === apiBase &&
+    (!options.org || options.org === saved.org)
+  ) {
+    p.log.info(
+      `Using the saved grant for ${chalk.cyan(saved.org)} (${saved.dashboardUrl || saved.apiBase}). Run ${chalk.cyan("add-sg-mcp logout")} first to request a new one.`,
+    );
+    return saved;
+  }
+
+  const timeoutSeconds = Number(options.loginTimeout ?? "300");
+  const spinner = p.spinner();
+  let result;
+  try {
+    result = await loginViaGrant({
+      apiBase,
+      dashboardUrl,
+      org: options.org,
+      timeoutMs:
+        (Number.isFinite(timeoutSeconds) ? timeoutSeconds : 300) * 1000,
+      openBrowser: options.browser === false ? async () => false : undefined,
+      onAuthUrl: (url) => {
+        p.log.step(
+          options.browser === false
+            ? "Open this link in your browser to approve the access:"
+            : "Opening your browser to approve access for this machine…",
+        );
+        p.log.message(chalk.cyan(url));
+        if (options.browser !== false) {
+          p.log.info("If the browser does not open, paste the link yourself.");
+        }
+        spinner.start(
+          "Waiting for you to choose an organization, roles and expiry in the browser…",
+        );
+      },
+    });
+  } catch (error) {
+    spinner.stop("The grant was not issued");
+    if (error instanceof LoginError && error.code === "cancelled") {
+      fail("Cancelled in the browser.");
+    }
+    fail(
+      error instanceof Error ? error.message : String(error),
+      "Run again, or use an API key instead: add-sg-mcp --auth apikey",
+    );
+  }
+  spinner.stop(
+    `Access granted · organization ${chalk.cyan(result.org)}${result.roles.length > 0 ? ` · roles ${result.roles.join(", ")}` : ""}`,
+  );
+  const credentials: SgCredentials = {
+    apiBase,
+    dashboardUrl,
+    org: result.org,
+    obtainedAt: new Date().toISOString(),
+    authType: "grant",
+    accessToken: result.accessToken,
+    expiresAt:
+      typeof result.expiresIn === "number"
+        ? new Date(Date.now() + result.expiresIn * 1000).toISOString()
+        : null,
   };
   const path = writeCredentials(credentials);
   p.log.info(`Credentials saved to ${shortenHome(path)}`);
@@ -272,30 +388,34 @@ export async function resolveCredentials(
   const token = options.token ?? envVar("SG_API_KEY");
   if (token) return credentialsFromToken(options, token);
 
-  if (!forceLogin) {
-    const saved = readCredentials();
-    if (saved) {
-      let requestedOrigin: string | undefined;
-      if (options.dashboardUrl) {
-        try {
-          requestedOrigin = new URL(options.dashboardUrl).origin;
-        } catch {
-          fail(`--dashboard-url is not a URL: ${options.dashboardUrl}`);
-        }
-      }
-      const orgMatches = !options.org || options.org === saved.org;
-      const envMatches =
-        (!options.region ||
-          environmentForRegion(options.region)?.dashboardUrl ===
-            saved.dashboardUrl) &&
-        (!requestedOrigin || requestedOrigin === saved.dashboardUrl);
-      if (orgMatches && envMatches) {
-        p.log.info(
-          `Using saved credentials for ${chalk.cyan(saved.org)} (${saved.dashboardUrl || saved.apiBase}). Run ${chalk.cyan("add-sg-mcp login")} to switch.`,
-        );
-        return saved;
+  // A grant belongs to --auth grant: apikey mode signs in for its own key.
+  const saved = readCredentials();
+  if (!forceLogin && saved?.authType === "apikey" && !isExpired(saved)) {
+    let requestedOrigin: string | undefined;
+    if (options.dashboardUrl) {
+      try {
+        requestedOrigin = new URL(options.dashboardUrl).origin;
+      } catch {
+        fail(`--dashboard-url is not a URL: ${options.dashboardUrl}`);
       }
     }
+    const orgMatches = !options.org || options.org === saved.org;
+    const envMatches =
+      (!options.region ||
+        environmentForRegion(options.region)?.dashboardUrl ===
+          saved.dashboardUrl) &&
+      (!requestedOrigin || requestedOrigin === saved.dashboardUrl);
+    if (orgMatches && envMatches) {
+      p.log.info(
+        `Using saved credentials for ${chalk.cyan(saved.org)} (${saved.dashboardUrl || saved.apiBase}). Run ${chalk.cyan("add-sg-mcp login")} to switch.`,
+      );
+      return saved;
+    }
+  }
+  if (saved?.authType === "grant" && !isExpired(saved)) {
+    p.log.warn(
+      `The saved grant for ${chalk.cyan(saved.org)} will be replaced; it stays active until you revoke it from Profile → Connected apps.`,
+    );
   }
   return credentialsFromBrowser(options);
 }
@@ -426,8 +546,8 @@ export async function runConnect(
   deps.showLogo();
   console.log();
   const auth = (options.auth ?? "apikey").toLowerCase();
-  if (auth !== "apikey" && auth !== "oauth") {
-    fail(`--auth must be apikey or oauth, got ${options.auth}`);
+  if (auth !== "apikey" && auth !== "grant" && auth !== "oauth") {
+    fail(`--auth must be apikey, grant or oauth, got ${options.auth}`);
   }
   if (options.project) {
     p.log.warn(
@@ -476,10 +596,13 @@ export async function runConnect(
       (a) => !PRESET_EXCLUDED_AGENTS.includes(a),
     );
   } else {
-    const credentials = await resolveCredentials(options);
+    const credentials =
+      auth === "grant"
+        ? await credentialsFromGrant(options)
+        : await resolveCredentials(options);
     apiBase = credentials.apiBase;
     org = credentials.org;
-    headers = [buildAuthHeader(credentials.apiKey)];
+    headers = [buildAuthHeader(credentials)];
     allowed = getAgentTypes().filter(
       (a) => !PRESET_EXCLUDED_AGENTS.includes(a),
     );
@@ -522,14 +645,29 @@ export async function runConnect(
 }
 
 export async function runLogin(
-  options: SgAuthOptions,
+  options: SgConnectOptions,
   deps: SgCommandDeps,
 ): Promise<void> {
   deps.showLogo();
   console.log();
-  const credentials = await resolveCredentials(options, true);
+  const auth = (options.auth ?? "apikey").toLowerCase();
+  if (auth === "oauth") {
+    fail(
+      "login is not needed with --auth oauth: each agent signs in on first use",
+    );
+  }
+  if (auth !== "apikey" && auth !== "grant") {
+    fail(`--auth must be apikey, grant or oauth, got ${options.auth}`);
+  }
+  // login always signs in afresh, so a grant login always asks for consent again.
+  const grant = auth === "grant";
+  const credentials = grant
+    ? await credentialsFromGrant(options, true)
+    : await resolveCredentials(options, true);
   p.outro(
-    `Signed in to ${chalk.cyan(credentials.org)}. Run ${chalk.cyan("add-sg-mcp")} to install the server and skills.`,
+    grant
+      ? `Grant saved for ${chalk.cyan(credentials.org)}. Run ${chalk.cyan("add-sg-mcp --auth grant")} to install the server and skills.`
+      : `Signed in to ${chalk.cyan(credentials.org)}. Run ${chalk.cyan("add-sg-mcp")} to install the server and skills.`,
   );
 }
 
@@ -539,6 +677,7 @@ export async function runLogout(
 ): Promise<void> {
   deps.showLogo();
   console.log();
+  const saved = readCredentials();
   const removed = deleteCredentials();
   p.log[removed ? "success" : "info"](
     removed
@@ -549,7 +688,9 @@ export async function runLogout(
     await runRemove({ ...options, yes: true }, deps, false);
   }
   p.outro(
-    "The API key itself stays valid; rotate it from Profile → API keys in the dashboard if needed.",
+    saved?.authType === "grant"
+      ? "The grant stays active until you revoke it from Profile → Connected apps."
+      : "The API key itself stays valid; rotate it from Profile → API keys in the dashboard if needed.",
   );
 }
 
@@ -558,12 +699,15 @@ export async function runStatus(deps: SgCommandDeps): Promise<void> {
   console.log();
   const saved = readCredentials();
   if (saved) {
+    const grant = saved.authType === "grant";
+    const secret = (grant ? saved.accessToken : saved.apiKey) ?? "";
     p.note(
       [
         `Organization: ${saved.org}`,
         `API: ${saved.apiBase}`,
         `Dashboard: ${saved.dashboardUrl || "-"}`,
-        `Key: ${maskKey(saved.apiKey)} (obtained ${saved.obtainedAt})`,
+        `${grant ? "Grant token" : "Key"}: ${maskKey(secret)} (obtained ${saved.obtainedAt})`,
+        ...(grant ? [`Validity: ${grantValidity(saved)}`] : []),
         `File: ${shortenHome(getCredentialsPath())}`,
       ].join("\n"),
       "Credentials",
@@ -706,7 +850,7 @@ function addAuthOptions(command: Command): Command {
     )
     .option(
       "--api-base <url>",
-      "API base for --token, e.g. https://api.app.stackguardian.io/api/v1",
+      "API base for --token or --auth grant, e.g. https://api.app.stackguardian.io/api/v1",
     )
     .option(
       "--no-browser",
@@ -729,8 +873,8 @@ export function registerSgCommands(
     )
     .option("--skip-skills", "Do not install the StackGuardian skills")
     .option(
-      "--auth <apikey|oauth>",
-      "Credential mode; oauth is a preview for agents with built-in MCP OAuth",
+      "--auth <apikey|grant|oauth>",
+      "Credential mode; grant asks the browser for a scoped grant token, oauth is a preview for agents with built-in MCP OAuth",
     );
 
   addAuthOptions(
@@ -740,7 +884,7 @@ export function registerSgCommands(
         "Sign in through the StackGuardian dashboard and save the credential",
       ),
   ).action(async (_options: SgAuthOptions, command: Command) => {
-    await runLogin(command.optsWithGlobals() as SgAuthOptions, deps);
+    await runLogin(command.optsWithGlobals() as SgConnectOptions, deps);
   });
 
   program

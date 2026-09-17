@@ -15,6 +15,7 @@ import {
   readCredentials,
   writeCredentials,
   deleteCredentials,
+  isExpired,
   type SgCredentials,
 } from "../src/sg/credentials.js";
 
@@ -47,6 +48,17 @@ const sample: SgCredentials = {
   org: "demo-org",
   apiKey: "sgu_abcdefghijklmnop",
   obtainedAt: "2026-09-08T12:00:00.000Z",
+  authType: "apikey",
+};
+
+const grant: SgCredentials = {
+  apiBase: "https://testapi.qa.stackguardian.io/api/v1",
+  dashboardUrl: "https://dash.qa.stackguardian.io",
+  org: "demo-org",
+  obtainedAt: "2026-09-16T12:00:00.000Z",
+  authType: "grant",
+  accessToken: "sgm_abcdefghijklmnop",
+  expiresAt: null,
 };
 
 test("path lives under XDG_CONFIG_HOME/add-sg-mcp/credentials.json", () => {
@@ -89,6 +101,75 @@ test("wrong version or missing fields read as null", () => {
     JSON.stringify({ version: 1, current: { ...sample, apiKey: "" } }),
   );
   assert.strictEqual(readCredentials(), null);
+});
+
+test("a grant credential round-trips with its token and expiry", () => {
+  setupConfigHome();
+  writeCredentials(grant);
+  assert.deepStrictEqual(readCredentials(), grant);
+  const dated = { ...grant, expiresAt: "2026-12-01T00:00:00.000Z" };
+  writeCredentials(dated);
+  assert.deepStrictEqual(readCredentials(), dated);
+});
+
+test("a grant credential without a token reads as null", () => {
+  const home = setupConfigHome();
+  mkdirSync(join(home, "add-sg-mcp"), { recursive: true });
+  writeFileSync(
+    join(home, "add-sg-mcp", "credentials.json"),
+    JSON.stringify({
+      version: 1,
+      current: { ...grant, accessToken: "" },
+    }),
+  );
+  assert.strictEqual(readCredentials(), null);
+});
+
+test("a grant with an unreadable expiry reads as null", () => {
+  const home = setupConfigHome();
+  mkdirSync(join(home, "add-sg-mcp"), { recursive: true });
+  for (const expiresAt of [12345, "", { at: 1 }]) {
+    writeFileSync(
+      join(home, "add-sg-mcp", "credentials.json"),
+      JSON.stringify({ version: 1, current: { ...grant, expiresAt } }),
+    );
+    assert.strictEqual(readCredentials(), null, JSON.stringify(expiresAt));
+  }
+});
+
+test("a file written before grants reads back as an apikey credential", () => {
+  const home = setupConfigHome();
+  mkdirSync(join(home, "add-sg-mcp"), { recursive: true });
+  const legacy = {
+    apiBase: sample.apiBase,
+    dashboardUrl: sample.dashboardUrl,
+    org: sample.org,
+    apiKey: sample.apiKey,
+    obtainedAt: sample.obtainedAt,
+  };
+  writeFileSync(
+    join(home, "add-sg-mcp", "credentials.json"),
+    JSON.stringify({ version: 1, current: legacy }),
+  );
+  assert.deepStrictEqual(readCredentials(), sample);
+});
+
+test("isExpired is true only for a past expiry", () => {
+  assert.strictEqual(isExpired(sample), false);
+  assert.strictEqual(isExpired(grant), false);
+  assert.strictEqual(
+    isExpired({ ...grant, expiresAt: "2020-01-01T00:00:00.000Z" }),
+    true,
+  );
+  assert.strictEqual(
+    isExpired({
+      ...grant,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    }),
+    false,
+  );
+  // Fail closed: an expiry we cannot read is not proof the grant is still good.
+  assert.strictEqual(isExpired({ ...grant, expiresAt: "not a date" }), true);
 });
 
 test("deleteCredentials reports whether a file was removed", () => {

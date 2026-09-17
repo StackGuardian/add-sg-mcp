@@ -23,6 +23,7 @@ const UNIT = [
   "tests/sg-preset.test.ts",
   "tests/sg-credentials.test.ts",
   "tests/sg-auth.test.ts",
+  "tests/sg-oauth.test.ts",
   "tests/sg-skills.test.ts",
 ];
 const E2E = [
