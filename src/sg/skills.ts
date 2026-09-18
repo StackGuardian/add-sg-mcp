@@ -3,13 +3,14 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   rmSync,
   symlinkSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AgentType } from "../types.js";
@@ -26,9 +27,39 @@ export type SgSkillName = (typeof SG_SKILL_NAMES)[number];
 const MANIFEST_FILE = "skills.json";
 const MANIFEST_VERSION = 1;
 
+/**
+ * A compiled binary (`bun run build:binary`) carries `skills/` as embedded
+ * files, which `cpSync` cannot read, so they are written to a private temp
+ * directory that is removed on exit.
+ */
+export function extractEmbeddedSkills(
+  root: string,
+  names: readonly string[],
+): string | undefined {
+  const files = names.filter((name) => name.startsWith("skills/"));
+  if (files.length === 0) return undefined;
+  const dir = mkdtempSync(join(tmpdir(), "add-sg-mcp-skills-"));
+  process.once("exit", () => rmSync(dir, { recursive: true, force: true }));
+  for (const name of files) {
+    const target = join(dir, name.slice("skills/".length));
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, readFileSync(join(root, name)));
+  }
+  return dir;
+}
+
+function embeddedFileNames(): string[] {
+  const bun = (
+    globalThis as { Bun?: { embeddedFiles?: ReadonlyArray<{ name?: string }> } }
+  ).Bun;
+  return (bun?.embeddedFiles ?? []).map((file) => file.name ?? "");
+}
+
 /** `skills/` ships in the npm package next to `dist/`; from `src/sg/` it is two levels up. */
 export function bundledSkillsDir(): string {
   const here = dirname(fileURLToPath(import.meta.url));
+  const embedded = extractEmbeddedSkills(here, embeddedFileNames());
+  if (embedded) return embedded;
   for (const candidate of [
     resolve(here, "..", "..", "skills"),
     resolve(here, "..", "skills"),
