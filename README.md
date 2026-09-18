@@ -32,7 +32,7 @@ Expand-Archive add-sg-mcp.zip -DestinationPath add-sg-mcp
 .\add-sg-mcp\add-sg-mcp.exe
 ```
 
-Move the executable to a directory on your `PATH` to keep it. Each release lists the archives' checksums in `SHA256SUMS`, and `gh attestation verify <archive> --repo StackGuardian/add-sg-mcp` confirms an archive was built by this repository's workflow. The executables are not yet notarized by Apple or code-signed for Windows: on macOS, download with `curl` as above rather than a browser, which would mark the file as quarantined.
+Move the executable to a directory on your `PATH` to keep it. Each release lists the archives' checksums in `SHA256SUMS`, and `gh attestation verify <archive> --repo StackGuardian/add-sg-mcp` confirms an archive was built by this repository's workflow. The executables are not yet notarized by Apple or code-signed for Windows: on macOS, download with `curl` as above rather than a browser, which would mark the file as quarantined; on Windows, a browser download may show a SmartScreen prompt (_More info → Run anyway_).
 
 ## How it works
 

@@ -124,7 +124,8 @@ jobs:
         working-directory: release
         run: |
           set -euo pipefail
-          line="$(grep " $ARCHIVE\$" SHA256SUMS)"
+          line="$(awk -v f="$ARCHIVE" '$2 == f' SHA256SUMS)"
+          [ -n "$line" ] || { echo "::error::$ARCHIVE is not in SHA256SUMS"; exit 1; }
           if command -v sha256sum >/dev/null; then
             echo "$line" | sha256sum -c -
           else
