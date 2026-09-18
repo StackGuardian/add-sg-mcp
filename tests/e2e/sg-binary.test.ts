@@ -109,14 +109,17 @@ test("the binary installs the server and the embedded skills", () => {
     claude.mcpServers["StackGuardian-demo-org"]?.url,
     "https://api.app.stackguardian.io/api/v1/orgs/demo-org/mcp/",
   );
+  // A Windows checkout may turn the source into CRLF; the embedded copy is LF.
+  const read = (path: string) =>
+    readFileSync(path, "utf-8").replace(/\r\n/g, "\n");
   for (const skill of [
     "sg-create-workflow",
     "sg-update-workflow",
     "sg-upgrade-workflow",
   ]) {
     assert.strictEqual(
-      readFileSync(join(home, ".claude", "skills", skill, "SKILL.md"), "utf-8"),
-      readFileSync(join(repoRoot, "skills", skill, "SKILL.md"), "utf-8"),
+      read(join(home, ".claude", "skills", skill, "SKILL.md")),
+      read(join(repoRoot, "skills", skill, "SKILL.md")),
       `${skill} matches the source`,
     );
   }
