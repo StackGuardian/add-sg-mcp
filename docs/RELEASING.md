@@ -104,6 +104,8 @@ Follow this every time you ship a new version. The whole sequence is typically 5
 
 5. **Wait for CI.** `release.yml` runs typecheck, tests, build, then `npm stage publish --provenance`. Watch it on the Actions tab. On green, the package is in npm staging, **not** live.
 
+   The same release fires `binaries.yml`: it compiles the standalone executables (macOS, Linux, Windows), runs each one on its own OS, and attaches the archives, `SHA256SUMS` and build provenance attestations to the release. If it fails, fix the cause and re-run it from the Actions tab (**Run workflow** with the tag, from `main`).
+
 6. **Review the staged tarball.**
 
    ```bash

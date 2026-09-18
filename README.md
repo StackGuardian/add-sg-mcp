@@ -13,6 +13,27 @@ It opens the StackGuardian dashboard so you can sign in and pick an organization
 
 Supported agents: Claude Code, Codex, Cursor, VS Code (Copilot), Gemini CLI, OpenCode, GitHub Copilot CLI, Windsurf, Kiro CLI, Zed, Cline, Goose, Grok Build, Kilo Code, Kimi Code, Antigravity, Pi, Mastra Code, MCPorter. Run `npx add-sg-mcp list-agents` for the current list.
 
+## Without Node.js
+
+Every [GitHub release](https://github.com/StackGuardian/add-sg-mcp/releases) also ships standalone executables for macOS, Linux and Windows. They do exactly what `npx add-sg-mcp` does; run `add-sg-mcp` wherever this README says `npx add-sg-mcp`.
+
+macOS and Linux (use `darwin-arm64`, `darwin-x64`, `linux-x64` or `linux-arm64`):
+
+```bash
+curl -fsSL https://github.com/StackGuardian/add-sg-mcp/releases/latest/download/add-sg-mcp-darwin-arm64.tar.gz | tar -xz add-sg-mcp
+./add-sg-mcp
+```
+
+Windows (PowerShell):
+
+```powershell
+Invoke-WebRequest https://github.com/StackGuardian/add-sg-mcp/releases/latest/download/add-sg-mcp-windows-x64.zip -OutFile add-sg-mcp.zip
+Expand-Archive add-sg-mcp.zip -DestinationPath add-sg-mcp
+.\add-sg-mcp\add-sg-mcp.exe
+```
+
+Move the executable to a directory on your `PATH` to keep it. Each release lists the archives' checksums in `SHA256SUMS`, and `gh attestation verify <archive> --repo StackGuardian/add-sg-mcp` confirms an archive was built by this repository's workflow. The executables are not yet notarized by Apple or code-signed for Windows: on macOS, download with `curl` as above rather than a browser, which would mark the file as quarantined.
+
 ## How it works
 
 1. `npx add-sg-mcp` starts a one-time callback listener on `127.0.0.1` and opens `https://app.stackguardian.io/orchestrator/cli-connect` (or the region you pick) in your browser.
