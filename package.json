@@ -1,6 +1,6 @@
 {
   "name": "add-sg-mcp",
-  "version": "v1.0.0",
+  "version": "1.0.0",
   "description": "Connect your coding agents to StackGuardian: installs the StackGuardian MCP server and skills into Claude Code, Codex, Cursor, VS Code, Gemini CLI, OpenCode and more with a single command.",
   "author": "StackGuardian <support@stackguardian.io>",
   "license": "Apache-2.0",
