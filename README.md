@@ -107,7 +107,7 @@ Use a grant token when an agent should be able to do less than you can.
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Connect another agent          | `npx add-sg-mcp -a cursor` (`npx add-sg-mcp list-agents` shows the names)                                                                                                                                               |
 | Connect another organization   | `npx add-sg-mcp login --org other-org --region eu`, then `npx add-sg-mcp`. It gets its own `StackGuardian-other-org` entry next to the first.                                                                           |
-| Disconnect one organization    | `npx add-sg-mcp remove --name StackGuardian-<org>`. This also removes the skills; run `npx add-sg-mcp` again to restore them for the organization you keep.                                                             |
+| Disconnect one organization    | `npx add-sg-mcp remove --name StackGuardian-<org>`. The skills stay for the organizations you keep.                                                                                                                     |
 | Update the tool and the skills | `npx add-sg-mcp@latest`, or run the install script again. Each run refreshes the skills.                                                                                                                                |
 | See what's installed           | `npx add-sg-mcp status`                                                                                                                                                                                                 |
 | Remove everything              | `npx add-sg-mcp logout --purge` removes the server and skills from your agents and forgets the credential. For the standalone executable, also delete `~/.local/bin/add-sg-mcp` (Windows: `%LOCALAPPDATA%\add-sg-mcp`). |
@@ -178,7 +178,7 @@ npx add-sg-mcp [options]
 | `npx add-sg-mcp logout [--purge]`                | Forget the credential; `--purge` also runs `remove`                            |
 | `npx add-sg-mcp list-agents`                     | List supported agents and their config files                                   |
 
-`remove` and `logout --purge` take every `StackGuardian-<org>` entry out (pass `--name` to remove just one).
+`remove` and `logout --purge` take every `StackGuardian-<org>` entry and the skills out. `remove --name <entry>` takes out just that entry and keeps the skills.
 
 ### Install script options
 

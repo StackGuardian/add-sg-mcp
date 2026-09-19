@@ -217,6 +217,50 @@ test("status reports the masked credential and installed agents; remove and logo
   assert.match(again, /Not signed in/);
 });
 
+test("remove --name drops one organization's entry and keeps the skills", () => {
+  const home = createTempDir();
+  const project = createTempDir();
+  expectOk(runCli([...TOKEN_ARGS, "-y", "-a", "claude-code"], project, home));
+  expectOk(
+    runCli(
+      [
+        "--token",
+        KEY,
+        "--org",
+        "other-org",
+        "--region",
+        "eu",
+        "-y",
+        "-a",
+        "claude-code",
+      ],
+      project,
+      home,
+    ),
+  );
+
+  const removed = expectOk(
+    runCli(
+      ["remove", "--name", NAME, "-y", "-a", "claude-code"],
+      project,
+      home,
+    ),
+  );
+  assert.match(removed, /Claude Code: removed StackGuardian-demo-org/);
+  assert.doesNotMatch(removed, /skills: removed/);
+  const claude = JSON.parse(
+    readFileSync(join(home, ".claude.json"), "utf-8"),
+  ) as { mcpServers?: Record<string, unknown> };
+  assert.strictEqual(claude.mcpServers?.[NAME], undefined);
+  assert.ok(claude.mcpServers?.["StackGuardian-other-org"]);
+  for (const dir of [
+    join(home, ".claude", "skills", "sg-create-workflow", "SKILL.md"),
+    join(home, ".agents", "skills", "sg-create-workflow", "SKILL.md"),
+  ]) {
+    assert.ok(existsSync(dir), `${dir} is kept`);
+  }
+});
+
 test("saved credentials are reused, and --project writes into the cwd with a .gitignore", () => {
   const home = createTempDir();
   const project = createTempDir();
