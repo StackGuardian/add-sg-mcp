@@ -8,6 +8,7 @@ A CLI that connects coding agents (Claude Code, Codex, Cursor, VS Code, Gemini C
 - `src/agents.ts`, `src/installer.ts`, `src/formats/*`, `src/schema.ts`, `src/reader.ts`, `src/opencode-config.ts`, `src/source-parser.ts`, `src/template.ts` — upstream, kept byte-identical so `git merge upstream/main` stays cheap. Do not put StackGuardian logic there.
 - `src/index.ts` — the bin. Upstream's `main()` install flow plus the registration of the `sg` commands (`registerSgCommands`, dependencies injected to avoid an import cycle).
 - `skills/` — the bundled `SKILL.md` folders shipped in the npm package.
+- `install.sh`, `install.ps1` — installers for the standalone executables that `.github/workflows/binaries.yml` builds (`bun run build:binary`) and attaches to each GitHub release.
 - `docs/superpowers/specs/` and `docs/superpowers/plans/` — design and implementation plan.
 
 ## Dev environment
