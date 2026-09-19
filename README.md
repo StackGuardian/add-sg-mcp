@@ -1,545 +1,264 @@
-# add-mcp
+# add-sg-mcp
 
-Add MCP servers to your favorite coding agents with a single command.
-
-Supports **Claude Code**, **Codex**, **Cursor**, **OpenCode**, **VS Code**, **Grok Build** and [16 more](#supported-agents).
-
-Docs and registry: [add-mcp.com](https://add-mcp.com)
-
-## Install an MCP Server
-
-Install an MCP server by remote URL or package name:
+Work with [StackGuardian](https://www.stackguardian.io) from your coding agent. One command adds the **StackGuardian MCP server** to Claude Code, Codex, Cursor, VS Code, Gemini CLI and [more](#supported-agents), and installs the **StackGuardian skills**. You can then ask your agent, in plain language, to find out why a run failed, deploy a template, change a workflow or check your cloud posture.
 
 ```bash
-npx add-mcp url | package name [options]
+npx add-sg-mcp
 ```
 
-Example installing the Context7 remote MCP server:
+No Node.js? Use the [one-line installer](#install) for macOS, Linux or Windows instead.
+
+## Before you start
+
+- A StackGuardian account with access to the organization you want to connect.
+- Your region: **Europe** (`app.stackguardian.io`) or **United States** (`us.stackguardian.io`).
+- At least one [supported coding agent](#supported-agents) on this machine.
+
+## Install
+
+With Node.js 18 or later:
 
 ```bash
-npx add-mcp https://mcp.context7.com/mcp
+npx add-sg-mcp
 ```
 
-Example installing the Context7 remote MCP server via the programmatic API — great for integrating add-mcp in your own CLI tool:
-
-```ts
-import { upsertServer } from "add-mcp";
-
-const result = upsertServer(
-  "cursor",
-  "context7",
-  { type: "http", url: "https://mcp.context7.com/mcp" },
-  { local: true },
-);
-console.log(result);
-```
-
-You can add env variables and arguments (stdio) and headers (remote) to the server config using the `--env`, `--args` and `--header` options. With `${VAR}` placeholders, interactive installs prompt for each variable (omit skipped optional keys so empty strings are not written to config).
-
-## Find MCP Servers
-
-Find and install MCP servers from the [add-mcp registry](https://add-mcp.com/registry):
+Without Node.js, the installer downloads a standalone executable, checks it against the release's `SHA256SUMS`, installs it and runs it:
 
 ```bash
-npx add-mcp find vercel
+# macOS and Linux
+curl -fsSL https://github.com/StackGuardian/add-sg-mcp/releases/latest/download/install.sh | sh
 ```
 
-The first `find`/`search` run automatically saves the add-mcp registry to `~/.config/add-mcp/config.json` (or `$XDG_CONFIG_HOME/add-mcp/config.json`). You can edit that file to replace the default registry, add the official Anthropic registry, or point at any registry-compatible server.
+```powershell
+# Windows (PowerShell)
+irm https://github.com/StackGuardian/add-sg-mcp/releases/latest/download/install.ps1 | iex
+```
 
-## Supported Agents
+Then:
 
-MCP servers can be installed to any of these agents:
+1. Pick your region. The StackGuardian dashboard opens in your browser; sign in if needed and choose the organization.
+2. Back in the terminal, choose the agents to connect. The ones found on this machine (or those you picked last time) are preselected.
+3. Restart those agents.
 
-| Agent                  | `--agent`            | Project Path                                                                  | Global Path                                                                                                     |
-| ---------------------- | -------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Antigravity            | `antigravity`        | -                                                                             | `~/.gemini/config/mcp_config.json` (shared by Antigravity, Antigravity IDE, and Antigravity CLI)                |
-| Cline VSCode Extension | `cline`              | -                                                                             | `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json` |
-| Cline CLI              | `cline-cli`          | -                                                                             | `~/.cline/data/settings/cline_mcp_settings.json`                                                                |
-| Claude Code            | `claude-code`        | `.mcp.json`                                                                   | `~/.claude.json`                                                                                                |
-| Claude Desktop         | `claude-desktop`     | -                                                                             | `~/Library/Application Support/Claude/claude_desktop_config.json`                                               |
-| Codex                  | `codex`              | `.codex/config.toml`                                                          | `~/.codex/config.toml`                                                                                          |
-| Cursor                 | `cursor`             | `.cursor/mcp.json`                                                            | `~/.cursor/mcp.json`                                                                                            |
-| fx                     | `fx`                 | -                                                                             | `~/.fx/mcp.json`                                                                                                |
-| Gemini CLI             | `gemini-cli`         | `.gemini/settings.json`                                                       | `~/.gemini/settings.json`                                                                                       |
-| Goose                  | `goose`              | `.goose/config.yaml`                                                          | `~/.config/goose/config.yaml`                                                                                   |
-| GitHub Copilot CLI     | `github-copilot-cli` | `.mcp.json` (or existing `.github/mcp.json`)                                  | `~/.copilot/mcp-config.json`                                                                                    |
-| Grok Build             | `grok-build`         | `.grok/config.toml`                                                           | `$GROK_HOME/config.toml` (defaults to `~/.grok/config.toml`)                                                    |
-| Kilo Code              | `kilo-code`          | `kilo.json` (or existing `.kilo/`, `.kilocode/`, or root `kilo.jsonc` config) | `~/.config/kilo/kilo.json` (or existing `~/.config/kilo/kilo.jsonc`)                                            |
-| Kimi Code              | `kimi-code`          | `.kimi-code/mcp.json`                                                         | `$KIMI_CODE_HOME/mcp.json` (defaults to `~/.kimi-code/mcp.json`)                                                |
-| Kiro CLI               | `kiro-cli`           | `.kiro/settings/mcp.json`                                                     | `~/.kiro/settings/mcp.json` (shared with the Kiro IDE)                                                          |
-| Mastra Code            | `mastracode`         | `.mastracode/mcp.json`                                                        | `~/.mastracode/mcp.json`                                                                                        |
-| MCPorter               | `mcporter`           | `config/mcporter.json`                                                        | `~/.mcporter/mcporter.json` (or existing `~/.mcporter/mcporter.jsonc`)                                          |
-| OpenCode               | `opencode`           | `opencode.jsonc` (or existing `opencode.json` / `.opencode/` config)          | `~/.config/opencode/opencode.jsonc` (or existing `opencode.json`)                                               |
-| Pi                     | `pi`                 | `.pi/mcp.json`                                                                | `$PI_CODING_AGENT_DIR/mcp.json` (defaults to `~/.pi/agent/mcp.json`)                                            |
-| VS Code                | `vscode`             | `.vscode/mcp.json`                                                            | `~/Library/Application Support/Code/User/mcp.json`                                                              |
-| Windsurf               | `windsurf`           | -                                                                             | `~/.codeium/windsurf/mcp_config.json`                                                                           |
-| Zed                    | `zed`                | `.zed/settings.json`                                                          | `~/Library/Application Support/Zed/settings.json`                                                               |
+With the standalone executable, run `add-sg-mcp` wherever this README says `npx add-sg-mcp`. See [Install script options](#install-script-options) to pin a version, change the install folder or use a mirror.
 
-**Aliases:** `codeium`, `cascade` → `windsurf`, `cline-vscode` → `cline`, `gemini` → `gemini-cli`, `github-copilot` → `vscode`, `grok` → `grok-build`, `kilo`, `kilocode` → `kilo-code`, `kimi` → `kimi-code`, `kiro` → `kiro-cli`, `mastra` → `mastracode`, `pi-agent` → `pi`
+## Check that it works
 
-Mastra Code also reads project `.mcp.json` for Claude Code compatibility. add-mcp writes `.mastracode/mcp.json` so a mixed Claude + Mastra install does not share that file.
+- **Claude Code:** run `/mcp`. `StackGuardian-<org>` should be listed, and the skills show up as `/sg-create-workflow`, `/sg-update-workflow` and `/sg-upgrade-workflow`.
+- **Any agent:** `npx add-sg-mcp status` shows your saved sign-in and which agents have the server and the skills.
+- Ask your agent something small, such as _"Show my five most recent StackGuardian workflow runs and their status."_
 
-Pi has no built-in MCP. add-mcp writes the Pi-owned files [`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter) reads (`pi install npm:pi-mcp-adapter`). A running Pi session picks the change up after `/reload`.
+Nothing there? See [Troubleshooting](#troubleshooting).
 
-Kimi Code only loads a project-level `.kimi-code/mcp.json` after you trust the folder in the CLI, so a project install may not take effect until then.
+## What your agent can do
 
-fx reads MCP servers only from `~/.fx/mcp.json`. A project file cannot add a server. A running session applies the change with `/mcp reload`.
+The MCP server works in the organization you connected, with the access of the credential you chose ([see below](#choose-how-your-agent-signs-in)). Its tools cover these areas:
 
-OpenCode keeps the shape already in the file: `mcp.<name>` on a V1 or empty config, `mcp.servers.<name>` when that native map is already there. In a mixed file, a native entry wins over a legacy entry with the same name. Adding a new name to a mixed file still writes V1; renaming a server keeps it in the map it already uses.
+| Area                        | Ask your agent, for example                                                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Workflows and runs          | "Why did the last run of `prod-vpc` fail?" · "Show the outputs of that run" · "Start a new run of `prod-vpc`"                        |
+| Approvals                   | "Approve the run of `prod-vpc` that's waiting for approval" — the agent always asks you before it approves, rejects or cancels a run |
+| Templates and the library   | "Find a StackGuardian template for an S3 bucket" · "Which workflows still use revision 3 of our `vpc` template?"                     |
+| Stacks and policies         | "Which stacks have drift?" · "Which stacks have no policy attached?"                                                                 |
+| Secrets and connectors      | "Is our AWS connector still authenticating?" · "Store a new secret `github-token`"                                                   |
+| Cloud inventory and posture | "How are we doing on cloud posture?" · "What are our ten most misconfigured AWS resources?" · "What isn't managed by IaC?"           |
 
-GitHub Copilot CLI project installs write `.mcp.json`. If `.mcp.json` is absent, an existing `.github/mcp.json` is reused. Copilot CLI does not read `.vscode/mcp.json` (that path is the VS Code agent). Entries left in `.vscode/mcp.json` from older Copilot CLI installs stay there for VS Code; rerun with `--agent github-copilot-cli` to write the CLI path. `.mcp.json` is shared with Claude Code: removing a server from either agent removes it for both. add-mcp will not create `.mcp.json` when `.github/mcp.json` already exists, because Copilot CLI would then ignore the GitHub file. Merge those servers into `.mcp.json` under `mcpServers` first. Copilot writes replace the file with strict JSON, so comments in that file are dropped (including global `~/.copilot/mcp-config.json`). Copilot CLI loads a project file only after the folder is trusted; confirm with `copilot mcp list --json`.
+Tools that create, change, run or delete things act on your real StackGuardian organization. Most agents ask before each tool call, so read what the agent is about to do before you approve it. In Claude Code, `/mcp` lists the server's current tools.
 
-## Installation Scope
+### Skills
 
-| Scope       | Flag      | Location                | Use Case                                      |
-| ----------- | --------- | ----------------------- | --------------------------------------------- |
-| **Project** | (default) | `.cursor/mcp.json` etc. | Committed with your project, shared with team |
-| **Global**  | `-g`      | `~/.cursor/mcp.json`    | Available across all projects                 |
+The skills walk the agent through multi-step changes and ask you at each decision instead of guessing:
 
-## Smart Detection
+| Skill                 | Use it to                                                                                                                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `sg-create-workflow`  | Create a workflow from a StackGuardian template or your own git repository (Terraform, OpenTofu or a custom step pipeline). You review the template's defaults before anything is created. |
+| `sg-update-workflow`  | Change an existing workflow's settings: connector, environment variables, schedules, approvals, runners, notifications and more. Only what you change is touched.                          |
+| `sg-upgrade-workflow` | Move a workflow to another template revision, with a dry run that shows the exact change first.                                                                                            |
 
-The CLI automatically detects agents based on your environment:
+In Claude Code, start one with `/sg-create-workflow` and so on. Other agents pick up a skill when your request matches it, for example _"Deploy the AWS VPC template to the networking workflow group."_
 
-**Default (project mode):**
+## Choose how your agent signs in
 
-- Detects project-level config files (`.cursor/`, `.vscode/`, `.mcp.json`, etc.)
-- Selects detected agents (have project config in the current directory) by default
-- Shows detected agents plus all other supported agents for selection
+|                     | API key (default)                              | Grant token                                                   | OAuth (preview)                                             |
+| ------------------- | ---------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------- |
+| Command             | `npx add-sg-mcp`                               | `npx add-sg-mcp --auth grant`                                 | `npx add-sg-mcp --auth oauth --org <org> --region <eu\|us>` |
+| What the agent gets | Your user API key for the organization         | A token for one organization and the roles you approve        | No stored credential; the agent signs you in on first use   |
+| Access              | Everything your roles allow                    | Only the roles you approved                                   | Your access, through the agent's own sign-in                |
+| Expiry and revoking | No expiry; rotate it from _Profile → API keys_ | You choose the expiry; revoke from _Profile → Connected apps_ | Handled through the agent's own sign-in                     |
 
-**With `-g` (global mode):**
+Use a grant token when an agent should be able to do less than you can.
 
-- Detects all globally-installed agents (including Claude Desktop, Codex, Zed)
-- Selects detected agents by default
-- Shows detected agents plus all other supported agents for selection
+### Grant tokens
 
-**No agents detected:**
+`npx add-sg-mcp --auth grant --region eu` (optionally `--org my-org`) asks the StackGuardian OAuth broker for a **grant token** instead of using your API key. The browser opens a consent page where you pick the organization, the roles the agent may use and how long the grant should last; the CLI receives an `sgm_` token on a loopback callback and writes it to each agent as an `Authorization: Bearer` header.
 
-- Interactive mode: Defaults to the last selection and shows all agents for selection
-- With `--yes`: Installs to all project-capable agents (project mode) or all global-capable agents (global mode)
+- The token is bound to **one organization and the roles you approved** — it is not your full user key, so an agent can be given less than you have.
+- `npx add-sg-mcp status` shows `expires <date>`, `no expiry` or `expired`. An expired grant is never reused; the next run asks for a new one.
+- Revoke a grant any time from _Profile → Connected apps_ in the dashboard. `logout` only deletes the local copy.
+- `npx add-sg-mcp login --auth grant` requests a fresh grant without touching agent configs.
 
-## Commands
+### OAuth (preview)
 
-Besides the implicit add command, `add-mcp` also supports the following commands:
+`npx add-sg-mcp --auth oauth --org my-org --region eu` writes the server URL without a credential for agents that implement MCP OAuth themselves (Claude Code, VS Code, Cursor, Codex, Gemini CLI, Windsurf). The agent then signs you in on first use. This needs the StackGuardian OAuth broker to be enabled for your environment.
 
-| Command       | Description                                                  |
-| ------------- | ------------------------------------------------------------ |
-| `find`        | Search MCP registry servers and install a selected match     |
-| `search`      | Alias for `find`                                             |
-| `list`        | List installed MCP servers across detected agents            |
-| `remove`      | Remove an MCP server from agent configurations               |
-| `sync`        | Synchronize server names and installations across agents     |
-| `unify`       | Alias for `sync`                                             |
-| `list-agents` | List all supported coding agents with scope (project/global) |
+## Everyday tasks
 
-## Add Command
+| To                             | Run                                                                                                                                                                                                                     |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Connect another agent          | `npx add-sg-mcp -a cursor` (`npx add-sg-mcp list-agents` shows the names)                                                                                                                                               |
+| Connect another organization   | `npx add-sg-mcp login --org other-org --region eu`, then `npx add-sg-mcp`. It gets its own `StackGuardian-other-org` entry next to the first.                                                                           |
+| Disconnect one organization    | `npx add-sg-mcp remove --name StackGuardian-<org>`. The skills stay for the organizations you keep.                                                                                                                     |
+| Update the tool and the skills | `npx add-sg-mcp@latest`, or run the install script again. Each run refreshes the skills.                                                                                                                                |
+| See what's installed           | `npx add-sg-mcp status`                                                                                                                                                                                                 |
+| Remove everything              | `npx add-sg-mcp logout --purge` removes the server and skills from your agents and forgets the credential. For the standalone executable, also delete `~/.local/bin/add-sg-mcp` (Windows: `%LOCALAPPDATA%\add-sg-mcp`). |
 
-### Usage Examples
+### Headless / CI
+
+Skip the browser with an API key from **Profile → API keys** in the dashboard:
 
 ```bash
-# Remote MCP server (streamable HTTP)
-npx add-mcp https://mcp.example.com/mcp
-
-# Remote MCP server (SSE transport)
-npx add-mcp https://mcp.example.com/sse --transport sse
-
-# Remote MCP server with auth header
-npx add-mcp https://mcp.example.com/mcp --header "Authorization: Bearer $TOKEN"
-
-# Remote server; fx reads the bearer token from this env var
-npx add-mcp https://mcp.example.com/mcp --bearer-token-env NEON_API_KEY
-
-# Remote server with a request timeout and OAuth scopes
-# (each agent only keeps the fields it supports; others are dropped with a warning)
-npx add-mcp https://mcp.example.com/mcp --timeout 30000 --scopes "read,write"
-
-# Auto-approve all tools for agents that support it (Codex, Claude Code)
-npx add-mcp "executor mcp" --name executor -a codex -a claude-code --auto-approve
-
-# Auto-approve only selected tools
-npx add-mcp "executor mcp" --name executor -a codex --auto-approve --approve-tool execute
-
-# npm package (runs via npx)
-npx add-mcp @modelcontextprotocol/server-postgres
-
-# Non-interactive installation to all detected agents in the project directory
-npx add-mcp https://mcp.example.com/mcp -y
-
-# Non-interactive installation to the global Claude Code config
-npx add-mcp https://mcp.example.com/mcp -g -a claude-code -y
-
-# Full command with arguments
-npx add-mcp "npx -y @org/mcp-server --flag value"
-
-# Node.js script
-npx add-mcp "node /path/to/server.js --port 3000"
-
-# Local stdio server with environment variables (repeatable)
-npx add-mcp @modelcontextprotocol/server-filesystem --env "API_KEY=secret" --env "DATABASE_URL=postgres://localhost/app"
-
-# Install for Cursor and Claude Code
-npx add-mcp https://mcp.example.com/mcp -a cursor -a claude-code
-
-# Install with custom server name
-npx add-mcp @modelcontextprotocol/server-postgres --name postgres
-
-# Install to all supported agents
-npx add-mcp mcp-server-github --all
-
-# Install to all agents, globally, without prompts
-npx add-mcp mcp-server-github --all -g -y
-
-# Add generated config files to .gitignore
-npx add-mcp https://mcp.example.com/mcp -a cursor -y --gitignore
+npx add-sg-mcp --token sgu_… --org my-org --region eu -y --all
+# or
+SG_API_KEY=sgu_… SG_ORG=my-org SG_REGION=eu npx add-sg-mcp -y -a claude-code
 ```
 
-### Options
-
-| Option                      | Description                                                                  |
-| --------------------------- | ---------------------------------------------------------------------------- |
-| `-g, --global`              | Install to user directory instead of project                                 |
-| `-a, --agent <agent>`       | Target specific agents (e.g., `cursor`, `claude-code`). Can be repeated.     |
-| `-t, --transport <type>`    | Transport type for remote servers: `http` (default), `sse`                   |
-| `--type <type>`             | Alias for `--transport`                                                      |
-| `-h, --header <header>`     | HTTP header for remote servers (repeatable, `Key: Value`)                    |
-| `--bearer-token-env <name>` | Env var whose value fx sends as a bearer token (capability-gated, see below) |
-| `--env <env>`               | Env var for local stdio servers (repeatable, `KEY=VALUE`)                    |
-| `--timeout <ms>`            | Request timeout (ms) for remote servers (capability-gated, see below)        |
-| `--scopes <scopes>`         | OAuth scopes for remote servers, comma-separated (capability-gated)          |
-| `--oauth-scopes <scopes>`   | Alias for `--scopes`                                                         |
-| `--auto-approve`            | Auto-approve MCP tool calls for supported agents (Codex, Claude Code)        |
-| `--approve-tool <tool>`     | Tool to auto-approve with `--auto-approve` (repeatable; defaults to all)     |
-| `-n, --name <name>`         | Server name (auto-inferred if not provided)                                  |
-| `-y, --yes`                 | Skip all confirmation prompts                                                |
-| `--all`                     | Install to all agents                                                        |
-| `--gitignore`               | Add generated config files to `.gitignore`                                   |
-
-#### Capability-gated fields (`--timeout`, `--scopes`, `--bearer-token-env`)
-
-Not every MCP client understands every field. `add-mcp` keeps one canonical
-server config and each agent declares which optional fields it supports, mapping
-them into that client's native shape:
-
-| Field              | Flag                                | Supported by                                                                        | Mapped to                                                                                                           |
-| ------------------ | ----------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Timeout            | `--timeout`                         | Claude Code, Gemini CLI, Grok Build, Kilo Code, Kimi Code, Kiro CLI, Pi             | `timeout` (milliseconds); Grok Build `tool_timeout_sec` (seconds), Kimi Code `toolTimeoutMs`, Pi `requestTimeoutMs` |
-| OAuth scopes       | `--scopes`                          | Cursor, Gemini CLI, Mastra Code                                                     | Cursor `auth.scopes`, Gemini and Mastra Code `oauth.scopes`                                                         |
-| Bearer token env   | `--bearer-token-env`                | fx                                                                                  | `bearer_token_env`                                                                                                  |
-| Tool auto-approval | `--auto-approve` / `--approve-tool` | Codex, Claude Code                                                                  | Codex approval modes; Claude Code permission allow rules                                                            |
-
-When you target an agent that does not support a field, `add-mcp` drops it from
-that agent's config and prints a warning (e.g. _"request timeout is not
-supported by VS Code; dropped from that config."_). Other agents still receive
-it. `--timeout`, `--scopes`, and `--bearer-token-env` apply to remote servers
-only; `--auto-approve` applies to both remote and local servers.
-
-When `--bearer-token-env` and `--header Authorization` are both set, fx omits
-the Authorization header and writes `bearer_token_env`. Other agents keep the
-header.
-
-#### Auto-approving tool calls (`--auto-approve`)
-
-`--auto-approve` preconfigures agent-level approval so the agent doesn't prompt
-before each MCP tool call — useful for servers that already gate actions
-internally. Use `--approve-tool <name>` (repeatable) to approve only specific
-tools; without it, all tools are approved.
-
-- **Codex** — writes approval modes into `config.toml`: per-tool
-  `tools.<name>.approval_mode = "approve"`, or `default_tools_approval_mode = "approve"` for all tools.
-- **Claude Code** — writes permission allow rules to a separate settings file
-  (`.claude/settings.local.json` for project installs, `~/.claude/settings.json`
-  for global), e.g. `mcp__<server>__<tool>`, or `mcp__<server>` for all tools.
-  The MCP server entry itself stays clean.
-
-> Note: Claude Code's all-tools rule (`mcp__<server>`) follows the documented
-> format, but a known Claude Code bug ([#34739](https://github.com/anthropics/claude-code/issues/34739))
-> can still prompt for non-fully-qualified MCP rules. Listing tools explicitly
-> with `--approve-tool` is the most reliable path there.
-
-### Transport Types
-
-`add-mcp` supports all three transport types: HTTP, SSE, and stdio. Some agents require `type` option to be set to specify the transport type. You can use the `--type` or `--transport` option to specify the transport type:
-
-| Transport | Flag               | Description                                           |
-| --------- | ------------------ | ----------------------------------------------------- |
-| **HTTP**  | `--transport http` | Streamable HTTP (default)                             |
-| **SSE**   | `--transport sse`  | Server-Sent Events (deprecated by MCP but still used) |
-
-Local servers (npm packages, commands) always use **stdio** transport.
-
-Note that most agents like Cursor and opencode do not require the `type` information to be set.
-
-## Find Command
-
-### Usage Examples
-
-```bash
-# Search for servers by keyword and choose one interactively
-npx add-mcp find vercel
-
-# Browse servers without a keyword
-npx add-mcp find
-
-# Use search alias (same as find)
-npx add-mcp search notion
-
-# Install a found server globally to a specific agent without prompts
-npx add-mcp find neon -a claude-code -g -y
-
-# Install to all agents and add generated project configs to .gitignore
-npx add-mcp find github --all --gitignore
-```
-
-### Options
-
-| Option                  | Description                                                              |
-| ----------------------- | ------------------------------------------------------------------------ |
-| `-g, --global`          | Install to user directory instead of project                             |
-| `-a, --agent <agent>`   | Target specific agents (e.g., `cursor`, `claude-code`). Can be repeated. |
-| `-n, --name <name>`     | Server name override (defaults to the selected catalog entry name)       |
-| `-y, --yes`             | Skip confirmation prompts                                                |
-| `--auto-approve`        | Auto-approve MCP tool calls for supported agents (Codex, Claude Code)    |
-| `--approve-tool <tool>` | Tool to auto-approve with `--auto-approve` (repeatable; defaults to all) |
-| `--all`                 | Install to all agents                                                    |
-| `--gitignore`           | Add generated config files to `.gitignore`                               |
-
-Transport for `find`/`search` is inferred from registry metadata. The CLI prefers HTTP remotes when available and only falls back to SSE when HTTP is not available for the selected install context.
-
-When a server offers both remote and stdio package options, interactive mode lets you choose one (remote is the default). With `-y`, it auto-selects remote.
-
-If a selected remote server defines URL variables or header inputs:
-
-- required values must be provided
-- optional values can be skipped with Enter
-- with `-y`, placeholders are inserted (for example `<your-header-value-here>`)
-
-### Configuring Registries for Find / Search
-
-The first time you run `find` or `search`, the CLI automatically saves the add-mcp registry to `~/.config/add-mcp/config.json` (respects `XDG_CONFIG_HOME`) and reuses that registry on every subsequent search.
-
-### Built-in Registries
-
-| Registry                        | Base URL                                                | Description                                                                                                                                                      |
-| ------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **add-mcp registry**            | `https://add-mcp.com/registry/api/v1/servers`           | MCP servers discovered by integrations.sh and exposed through an MCP registry-compatible API, using add-mcp's checked-in `registry.json` as the source of truth. |
-| **Official Anthropic registry** | `https://registry.modelcontextprotocol.io/v0.1/servers` | The community-driven MCP server registry maintained by Anthropic. Contains the broadest catalog of MCP servers.                                                  |
-
-> The add-mcp registry previously lived at `https://mcp.agent-tooling.dev/api/v1/servers`. That URL keeps working, and saved configs referencing it are migrated to the add-mcp.com address automatically on the next `find`/`search` run.
-
-### Missing A Server in integrations.sh?
-
-The default add-mcp registry is generated from [integrations.sh](https://integrations.sh). To be listed in add-mcp, add your MCP server to integrations.sh. Package-only servers, and remotes integrations.sh dropped that we still want in `find`, go in `registry.overlay.json`.
-
-Maintainers can refresh the checked-in registry snapshot with:
-
-```bash
-bun run registry:sync
-bun run registry:verify
-```
-
-### Editing or Removing Registries
-
-Registry selections are stored in `~/.config/add-mcp/config.json` under the `findRegistries` key. You can edit this file directly to replace, add, remove, or reorder registries.
-
-Default add-mcp registry:
-
-```json
-{
-  "version": 1,
-  "findRegistries": [
-    {
-      "url": "https://add-mcp.com/registry/api/v1/servers",
-      "label": "add-mcp registry"
-    }
-  ]
-}
-```
-
-Replace the default with the official Anthropic registry:
-
-```json
-{
-  "version": 1,
-  "findRegistries": [
-    {
-      "url": "https://registry.modelcontextprotocol.io/v0.1/servers",
-      "label": "Official Anthropic registry"
-    }
-  ]
-}
-```
-
-Search both the add-mcp registry and the official Anthropic registry:
-
-```json
-{
-  "version": 1,
-  "findRegistries": [
-    {
-      "url": "https://add-mcp.com/registry/api/v1/servers",
-      "label": "add-mcp registry"
-    },
-    {
-      "url": "https://registry.modelcontextprotocol.io/v0.1/servers",
-      "label": "Official Anthropic registry"
-    }
-  ]
-}
-```
-
-To reset to the default add-mcp registry, remove the `findRegistries` key or delete the config file.
-
-### Adding a Custom Registry
-
-Any server that implements the registry API can be added as a custom entry. The CLI sends a `GET` request to the configured `url` with the following query parameters:
-
-| Parameter | Value                                  |
-| --------- | -------------------------------------- |
-| `search`  | The user's search keyword (lowercased) |
-| `version` | `latest`                               |
-| `limit`   | `100`                                  |
-
-The endpoint must return JSON in this shape:
-
-```json
-{
-  "servers": [
-    {
-      "server": {
-        "name": "example-server",
-        "description": "An example MCP server",
-        "version": "1.0.0",
-        "remotes": [
-          {
-            "type": "streamable-http",
-            "url": "https://mcp.example.com/mcp"
-          }
-        ]
-      }
-    }
-  ]
-}
-```
-
-To add your own registry, append an entry to `findRegistries` in `~/.config/add-mcp/config.json`:
-
-```json
-{
-  "url": "https://my-registry.example.com/api/v1/servers",
-  "label": "My custom registry"
-}
-```
-
-## List Command
-
-List installed MCP servers across detected agents:
-
-```bash
-# List servers for all detected agents in the project
-npx add-mcp list
-
-# List global server configs
-npx add-mcp list -g
-
-# List servers for a specific agent (shown even if not detected)
-npx add-mcp list -a cursor
-```
-
-| Option                | Description                            |
-| --------------------- | -------------------------------------- |
-| `-g, --global`        | List global configs instead of project |
-| `-a, --agent <agent>` | Filter to specific agent(s)            |
-
-## Remove Command
-
-Remove an MCP server from agent configurations by server name, URL, or package name:
-
-```bash
-# Remove by server name (interactive selection by default)
-npx add-mcp remove neon
-
-# Remove all matches without prompting
-npx add-mcp remove neon -y
-
-# Remove by URL
-npx add-mcp remove https://mcp.neon.tech/mcp -y
-
-# Remove from global configs for a specific agent
-npx add-mcp remove neon -g -a cursor -y
-```
-
-| Option                | Description                          |
-| --------------------- | ------------------------------------ |
-| `-g, --global`        | Remove from global configs           |
-| `-a, --agent <agent>` | Filter to specific agent(s)          |
-| `-y, --yes`           | Remove all matches without prompting |
-
-## Sync Command
-
-Synchronize server names and installations across all detected agents. Servers are grouped by URL or package name, and each group is unified to the shortest server name. Servers with conflicting headers, env, or args across agents are skipped with a warning.
-
-```bash
-# Sync project-level configs (interactive confirmation)
-npx add-mcp sync
-
-# Sync without prompting
-npx add-mcp sync -y
-
-# Sync global configs
-npx add-mcp sync -g -y
-```
-
-| Option         | Description                            |
-| -------------- | -------------------------------------- |
-| `-g, --global` | Sync global configs instead of project |
-| `-y, --yes`    | Skip confirmation prompts              |
-
-`unify` is an alias for `sync`.
-
-## Programmatic API
-
-```ts
-import {
-  detectProjectAgents,
-  detectGlobalAgents,
-  upsertServer,
-  removeServer,
-  listInstalledServers,
-} from "add-mcp";
-
-const project = detectProjectAgents("/path/to/project");
-const global = await detectGlobalAgents();
-
-// Remote server
-upsertServer(
-  "claude-code",
-  "example",
-  { type: "http", url: "https://mcp.example.com/api" },
-  { local: true, cwd: "/path/to/project" },
-);
-
-// Stdio (npm package)
-upsertServer("claude-code", "postgres", {
-  command: "npx",
-  args: ["-y", "@modelcontextprotocol/server-postgres"],
-});
-
-const projectServers = await listInstalledServers({
-  cwd: "/path/to/project",
-});
-const globalServers = await listInstalledServers({ global: true });
-
-removeServer("claude-code", "example", {
-  local: true,
-  cwd: "/path/to/project",
-});
-```
-
-`upsertServer` and `removeServer` return `{ success, path, error? }` rather than throwing.
+`--api-base https://…/api/v1` replaces `--region` for non-standard environments. In a Docker image, `curl -fsSL …/install.sh | ADD_SG_MCP_NO_RUN=1 sh` installs the executable without running it.
 
 ## Troubleshooting
 
-### Server not loading
+**The server doesn't show up in my agent.** Restart the agent; most read their MCP config only at startup. Then run `npx add-sg-mcp status`. If the agent isn't listed, it wasn't selected: run `npx add-sg-mcp -a <agent>`. With `--project`, the server is only in that project's config.
 
-Some agents & editors like Claude Code require a restart to load the new MCP server. Otherwise, like Cursor, require you to navigate to the MCP settings page and toggle the new server as enabled.
+**"No coding agents detected on this machine."** With `-y`, or when there's no terminal to prompt in, only detected agents are used. Name them instead (`-a claude-code -a cursor`) or pass `--all`.
 
-fx reads MCP servers only from `~/.fx/mcp.json`. A project file cannot add a server. A running session applies the change with `/mcp reload`.
+**The browser doesn't open, or sign-in times out.** Add `--no-browser` and open the printed link in a browser on the same machine; the sign-in returns to a listener on `127.0.0.1`. Sign-in waits five minutes (`--login-timeout <seconds>` changes that). On a remote server or in CI, use an API key instead ([Headless / CI](#headless--ci)).
+
+**My agent gets "unauthorized" errors.** The credential in the agent's config no longer works:
+
+- API key rotated or deleted: run `npx add-sg-mcp login`, then `npx add-sg-mcp` to write the new key to your agents.
+- Grant expired: `npx add-sg-mcp --auth grant` asks for a new one.
+- Grant revoked: run `npx add-sg-mcp login --auth grant`, then `npx add-sg-mcp --auth grant`.
+
+**The skills don't appear.** Restart the agent. Mastra Code and MCPorter have no skills support, so they get the server only. `--skip-skills` skips them on purpose.
+
+**"… exists and was not installed by add-sg-mcp."** A skill folder with the same name is already in the agent's skills directory. Move it away and run again.
+
+**Claude Desktop.** Not supported here: Claude Desktop only takes local servers from this tool. Add StackGuardian through _Settings → Connectors_ instead.
+
+**"this Linux has no glibc".** The standalone executables need glibc, which Alpine and other musl-based systems lack. Use `npx add-sg-mcp` with Node.js there.
+
+## Reference
+
+### Options
+
+```
+npx add-sg-mcp [options]
+
+  --region <eu|us|qa>        StackGuardian region (prompted when omitted)
+  --org <org>                Organization to connect (pre-selected in the browser)
+  -a, --agent <agent>        Agents to install to (repeatable; default: the ones detected)
+  --all                      Every supported agent
+  -y, --yes                  No prompts (installs to all detected agents)
+  --project                  Project scope (current directory) instead of your user profile;
+                             the generated files are added to .gitignore
+  -n, --name <name>          Server entry name (default: StackGuardian-<org>)
+  --skip-skills              Do not install the skills
+  --token <api-key>          Use this API key instead of signing in (or SG_API_KEY)
+  --api-base <url>           API base for --token or --auth grant, in place of --region
+  --no-browser               Print the sign-in link instead of opening a browser
+  --login-timeout <seconds>  How long to wait for the browser (default 300)
+  --dashboard-url <url>      Another dashboard (other environments, local dev)
+  --auth <apikey|grant|oauth> Credential mode (default apikey)
+```
+
+| Command                                          | What it does                                                                   |
+| ------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `npx add-sg-mcp login`                           | Sign in again (switch organization or region) without touching agent configs   |
+| `npx add-sg-mcp status`                          | Show the saved credential (masked) and which agents have the server and skills |
+| `npx add-sg-mcp remove [-a <agent>] [--project]` | Remove the server entry and the skills from your agents                        |
+| `npx add-sg-mcp logout [--purge]`                | Forget the credential; `--purge` also runs `remove`                            |
+| `npx add-sg-mcp list-agents`                     | List supported agents and their config files                                   |
+
+`remove` and `logout --purge` take every `StackGuardian-<org>` entry and the skills out. `remove --name <entry>` takes out just that entry and keeps the skills.
+
+### Install script options
+
+Pass options to the first run:
+
+```bash
+curl -fsSL https://github.com/StackGuardian/add-sg-mcp/releases/latest/download/install.sh | sh -s -- --region eu -a claude-code
+```
+
+```powershell
+& ([scriptblock]::Create((irm https://github.com/StackGuardian/add-sg-mcp/releases/latest/download/install.ps1))) --region eu -a claude-code
+```
+
+Environment variables (with `curl | sh`, set them on the `sh` side: `… | ADD_SG_MCP_NO_RUN=1 sh`):
+
+| Variable                  | Effect                                                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `ADD_SG_MCP_VERSION`      | Release to install, e.g. `v0.2.0` (default: latest)                                                                       |
+| `ADD_SG_MCP_INSTALL_DIR`  | Install directory. Default `~/.local/bin`; on Windows `%LOCALAPPDATA%\add-sg-mcp\bin`, which is added to your user `PATH` |
+| `ADD_SG_MCP_DOWNLOAD_URL` | Base URL of a mirror that serves the release files                                                                        |
+| `ADD_SG_MCP_NO_RUN`       | `1` installs without running `add-sg-mcp`                                                                                 |
+
+Builds exist for macOS (Apple Silicon, Intel), Linux with glibc (x64, arm64) and Windows x64. To install by hand, download `add-sg-mcp-<os>-<arch>.tar.gz` (or `add-sg-mcp-windows-x64.zip`) from the release and put the executable on your `PATH`. `gh attestation verify <file> --repo StackGuardian/add-sg-mcp` confirms that a file was built by this repository's workflow.
+
+The executables are not yet notarized by Apple or code-signed for Windows. The install scripts are not affected, but a browser download is quarantined on macOS and may show a SmartScreen prompt on Windows (_More info → Run anyway_).
+
+### Supported agents
+
+Claude Code, Codex, Cursor, VS Code (Copilot), Gemini CLI, OpenCode, GitHub Copilot CLI, Windsurf, Kiro CLI, Zed, Cline, Goose, Grok Build, Kilo Code, Kimi Code, Antigravity, Pi, Mastra Code, MCPorter. Run `npx add-sg-mcp list-agents` for the current list and each agent's config file.
+
+- **Codex** and **Grok Build** store MCP servers in a TOML file that is rewritten as a whole; comments in `~/.codex/config.toml` are not preserved.
+- **Claude Desktop** and **fx** are skipped: Claude Desktop only supports local (stdio) servers here and fx only sends bearer tokens. Add StackGuardian to Claude Desktop through _Settings → Connectors_ instead.
+- **Claude Code** and **GitHub Copilot CLI** share `.mcp.json` in project scope.
+- Mastra Code and MCPorter get the server but have no skills directory.
+
+### How it works
+
+1. `npx add-sg-mcp` starts a one-time callback listener on `127.0.0.1` and opens `https://app.stackguardian.io/orchestrator/cli-connect` (or the region you pick) in your browser.
+2. You sign in if needed and choose the organization to connect.
+3. The dashboard sends your organization API key back to the CLI on the loopback callback. The key is stored in `~/.config/add-sg-mcp/credentials.json` (mode `0600`).
+4. The CLI writes the server entry into each selected agent's own config file:
+
+   ```json
+   {
+     "mcpServers": {
+       "StackGuardian-<org>": {
+         "type": "http",
+         "url": "https://api.app.stackguardian.io/api/v1/orgs/<org>/mcp/",
+         "headers": { "Authorization": "apikey sgu_…" }
+       }
+     }
+   }
+   ```
+
+   (Codex gets the TOML equivalent, Goose YAML, and so on — each agent's native format.)
+
+5. The skills are copied to `~/.agents/skills/` and symlinked into each agent's skills directory (`~/.claude/skills`, `~/.codex/skills`, `~/.cursor/skills`, …), so a single copy serves every agent.
+
+### Security
+
+- On Windows there is no `0600` equivalent; the file relies on the ACL of your profile folder.
+- With `--auth apikey` (the default) the credential is your **user API key for the selected organization**: it acts as you, with your roles, and it does not expire on its own. Rotate it from _Profile → API keys_ in the dashboard if a machine is lost.
+- With `--auth grant` the credential is a **grant token bound to one organization and the roles you approved**, and it can carry an expiry. Revoke it from _Profile → Connected apps_. In both cases `logout` only deletes the local copy — it never invalidates the credential.
+- By default nothing is written into project directories. `--project` warns and adds the generated files to `.gitignore`.
+- The CLI accepts a callback only when its one-time `state` matches, and only API hosts under `stackguardian.io` (or the host you passed with `--dashboard-url`).
+- `status` never prints the key or the grant token in full; the callback page strips the credential from the browser history, and a grant flow keeps its PKCE verifier off the front channel (only the one-time code travels through the browser).
+
+## Contributing
+
+```bash
+bun install
+bun run dev -- --help          # run from source
+bun run typecheck && bun run test
+bun run build:binary           # standalone executable for this machine
+```
+
+Tests are plain `tsx` scripts with `node:assert` (no mocks; the login test spins up a real loopback server), run by `tests/run.mjs` under a throwaway `HOME`. See `AGENTS.md` for the workflow, `docs/RELEASING.md` for releases and `docs/superpowers/specs/` for the design.
+
+This project is a fork of [neon-solutions/add-mcp](https://github.com/neon-solutions/add-mcp) (Apache-2.0); the agent config writers come from upstream unchanged. Passing a URL or package name as the first argument still installs any other MCP server the way `add-mcp` does.
+
+## License
+
+Apache-2.0. See `LICENSE` and `NOTICE`.

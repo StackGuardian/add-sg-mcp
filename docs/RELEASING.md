@@ -1,15 +1,17 @@
-# Releasing `add-mcp`
+> **Fork note:** this pipeline was inherited from upstream `add-mcp`. Before the first release, an npm owner of `add-sg-mcp` must register the Trusted Publisher for the `StackGuardian/add-sg-mcp` repository and the `release.yml` workflow (see the one-time setup below); nothing publishes until that is done.
 
-This document is the authoritative guide for publishing `add-mcp` to npm. It covers the threat model, the one-time setup of the secure publishing pipeline, the per-release runbook, and the break-glass procedure if something goes wrong.
+# Releasing `add-sg-mcp`
 
-`add-mcp` does **not** support publishing from a maintainer's laptop. Every published version must pass through the GitHub Actions release workflow with OIDC trusted publishing, provenance, and a manual stage-approval step on npm.
+This document is the authoritative guide for publishing `add-sg-mcp` to npm. It covers the threat model, the one-time setup of the secure publishing pipeline, the per-release runbook, and the break-glass procedure if something goes wrong.
+
+`add-sg-mcp` does **not** support publishing from a maintainer's laptop. Every published version must pass through the GitHub Actions release workflow with OIDC trusted publishing, provenance, and a manual stage-approval step on npm.
 
 ## Why
 
 Recent npm supply-chain incidents (Shai-Hulud, repeated maintainer-account takeovers, leaked CI tokens) almost all stem from one root cause: **long-lived npm publish tokens stored somewhere**. The pipeline below removes that root cause and adds two independent gates between "commit on `main`" and "live on the registry":
 
 1. **Click "Publish release" on GitHub** — confirms the commit and version are intentional.
-2. **`npm stage approve add-mcp` with WebAuthn** — confirms the actual tarball CI produced is what should go live.
+2. **`npm stage approve add-sg-mcp` with WebAuthn** — confirms the actual tarball CI produced is what should go live.
 
 Either gate alone is enough to stop a bad publish.
 
@@ -23,14 +25,14 @@ flowchart LR
     ciRun --> oidc["GitHub mints OIDC token (id-token: write)"]
     oidc --> npmStage["npm stage publish --provenance"]
     npmStage --> staging["Package sits in npm staging area"]
-    staging --> review["Maintainer: npm stage view add-mcp"]
-    review --> approve["npm stage approve add-mcp (WebAuthn)"]
+    staging --> review["Maintainer: npm stage view add-sg-mcp"]
+    review --> approve["npm stage approve add-sg-mcp (WebAuthn)"]
     approve --> live["Live on registry.npmjs.org with provenance"]
 ```
 
 ### Defensive primitives in play
 
-- **npm Trusted Publishing (OIDC)** — npm only accepts a publish from `release.yml` in `neon-solutions/add-mcp`, authenticated by a short-lived OIDC token GitHub mints per run. No long-lived tokens exist anywhere.
+- **npm Trusted Publishing (OIDC)** — npm only accepts a publish from `release.yml` in `StackGuardian/add-sg-mcp`, authenticated by a short-lived OIDC token GitHub mints per run. No long-lived tokens exist anywhere.
 - **npm provenance attestation** — every published version is cryptographically signed via Sigstore and bound to the exact GitHub commit and workflow that built it. Anyone can run `npm audit signatures` to verify.
 - **"Require 2FA and disallow tokens"** on the package — registry-side switch that refuses any publish that is not OIDC + 2FA, even if an attacker steals a legacy token.
 - **npm staged publishing** — `release.yml` runs `npm stage publish`, not `npm publish`. The tarball lands in a staging area; the maintainer inspects it and approves with WebAuthn before it goes live.
@@ -47,15 +49,15 @@ Work through these top to bottom. None of them can be automated; they are all in
 > Done under your personal npm user, not the package.
 
 - [ ] **A1.** Enable WebAuthn/passkey 2FA at `https://www.npmjs.com/settings/<your-username>/2fa`. If TOTP is your only second factor, enroll a passkey and then remove TOTP. New TOTP setups are disabled by npm and existing TOTP is being phased out.
-- [ ] **A2.** Revoke every existing publish token at `https://www.npmjs.com/settings/<your-username>/tokens` that grants write access to `add-mcp`. After trusted publishing is configured, nothing should need one.
+- [ ] **A2.** Revoke every existing publish token at `https://www.npmjs.com/settings/<your-username>/tokens` that grants write access to `add-sg-mcp`. After trusted publishing is configured, nothing should need one.
 
 ### B. npm package configuration
 
-> Done on the `add-mcp` package page on npmjs.com.
+> Done on the `add-sg-mcp` package page on npmjs.com.
 
-- [ ] **B1.** Go to `https://www.npmjs.com/package/add-mcp/access`. Under **Trusted Publisher**, click **GitHub Actions** and enter:
-  - Organization: `neon-solutions`
-  - Repository: `add-mcp`
+- [ ] **B1.** Go to `https://www.npmjs.com/package/add-sg-mcp/access`. Under **Trusted Publisher**, click **GitHub Actions** and enter:
+  - Organization: `StackGuardian`
+  - Repository: `add-sg-mcp`
   - Workflow filename: `release.yml`
   - Allowed actions: select **`npm stage publish` only**. **Do not** check `npm publish`.
   - Save.
@@ -64,7 +66,7 @@ Work through these top to bottom. None of them can be automated; they are all in
 
 - [ ] **B2.** On the same page, find **Publishing access** and choose **"Require two-factor authentication and disallow tokens"**. Save. From this point any publish that is not OIDC + 2FA-approved staged release is rejected by the registry.
 
-### C. GitHub repository configuration (`neon-solutions/add-mcp`)
+### C. GitHub repository configuration (`StackGuardian/add-sg-mcp`)
 
 - [ ] **C1.** Settings -> Rules -> Rulesets -> **New tag ruleset**. Name it "release tags". Target tags matching `v*`. Enable "Restrict creations", "Restrict updates", and "Restrict deletions". Add yourself (and any future co-maintainers) to the bypass list. Save.
 - [ ] **C2.** Settings -> Actions -> General -> **Workflow permissions** = "Read repository contents and packages permissions" (the more restrictive of the two radio buttons). Job-level `id-token: write` in `release.yml` still works because workflow files can request additional permissions explicitly, but they cannot exceed what the repo allows globally.
@@ -73,7 +75,7 @@ Work through these top to bottom. None of them can be automated; they are all in
 
 ### D. First-release smoke test
 
-- [ ] **D1.** Cut a patch release through the runbook below (e.g. `v1.9.1` with an empty CHANGELOG entry like "internal: validate release pipeline"). Walk through the stage-review step slowly: open the staged tarball on npmjs.com, confirm the file list matches `package.json#files` (`dist/`, `README.md`), confirm the provenance attestation badge appears, then approve. Once the version is live, run `npm audit signatures add-mcp@1.9.1` to verify Sigstore signatures end to end.
+- [ ] **D1.** Cut a patch release through the runbook below (e.g. `v1.9.1` with an empty CHANGELOG entry like "internal: validate release pipeline"). Walk through the stage-review step slowly: open the staged tarball on npmjs.com, confirm the file list matches `package.json#files` (`dist/`, `README.md`), confirm the provenance attestation badge appears, then approve. Once the version is live, run `npm audit signatures add-sg-mcp@1.9.1` to verify Sigstore signatures end to end.
 
 ## Per-release runbook
 
@@ -93,7 +95,7 @@ Follow this every time you ship a new version. The whole sequence is typically 5
    - Commit as `chore: release vX.Y.Z` and push to `main`.
 
 4. **Draft and publish the GitHub Release.**
-   - On `https://github.com/neon-solutions/add-mcp/releases`, click **Draft a new release**.
+   - On `https://github.com/StackGuardian/add-sg-mcp/releases`, click **Draft a new release**.
    - "Choose a tag" -> type `vX.Y.Z` (must match `package.json#version`; the workflow will fail fast if they disagree).
    - Target: `main`.
    - Title: `vX.Y.Z`.
@@ -102,11 +104,13 @@ Follow this every time you ship a new version. The whole sequence is typically 5
 
 5. **Wait for CI.** `release.yml` runs typecheck, tests, build, then `npm stage publish --provenance`. Watch it on the Actions tab. On green, the package is in npm staging, **not** live.
 
+   The same release fires `binaries.yml`: it compiles the standalone executables (macOS, Linux, Windows), runs each one on its own OS, and attaches the archives, `install.sh`, `install.ps1`, `SHA256SUMS` and build provenance attestations to the release. If it fails, use **Re-run failed jobs** on that run. To attach binaries later, use **Run workflow** with the tag as _Use workflow from_ and as the `tag` input; the tag must match that commit's `package.json` version.
+
 6. **Review the staged tarball.**
 
    ```bash
    npm stage list             # shows pending staged versions for packages you maintain
-   npm stage view add-mcp     # inspect the staged release for add-mcp
+   npm stage view add-sg-mcp     # inspect the staged release for add-sg-mcp
    ```
 
    Verify:
@@ -118,7 +122,7 @@ Follow this every time you ship a new version. The whole sequence is typically 5
 7. **Approve.**
 
    ```bash
-   npm stage approve add-mcp  # prompts for WebAuthn
+   npm stage approve add-sg-mcp  # prompts for WebAuthn
    ```
 
    The package goes live.
@@ -126,9 +130,9 @@ Follow this every time you ship a new version. The whole sequence is typically 5
 8. **Verify it landed correctly.**
 
    ```bash
-   npm view add-mcp version
-   npm view add-mcp dist-tags
-   npm audit signatures add-mcp@X.Y.Z
+   npm view add-sg-mcp version
+   npm view add-sg-mcp dist-tags
+   npm audit signatures add-sg-mcp@X.Y.Z
    ```
 
 9. **If anything looked wrong at step 6, reject instead of approving.**
@@ -141,7 +145,7 @@ Follow this every time you ship a new version. The whole sequence is typically 5
 
 ### Versioning
 
-`add-mcp` follows semver. As a rough guide:
+`add-sg-mcp` follows semver. As a rough guide:
 
 - **patch** — bug fixes, registry adds, internal-only changes that do not alter behaviour.
 - **minor** — new features, new agent support, new flags. Backward-compatible.
@@ -158,18 +162,18 @@ Follow this every time you ship a new version. The whole sequence is typically 5
 
 ### Suspected repository compromise (malicious PR, force-push, etc.)
 
-1. Disable the trusted-publisher binding on `https://www.npmjs.com/package/add-mcp/access` to halt all CI publishes immediately.
+1. Disable the trusted-publisher binding on `https://www.npmjs.com/package/add-sg-mcp/access` to halt all CI publishes immediately.
 2. Audit `main`, the `release.yml` workflow, and the `v*` tag history.
 3. Once clean, re-enable the trusted publisher and ship a clean release.
 
-Note: even without step 1, an attacker cannot directly publish from a PR branch or a fork because OIDC only accepts publishes from `release.yml` on `neon-solutions/add-mcp`'s default branch flow. Tag protection prevents them from triggering the real `release.yml`. Step 1 is belt and braces.
+Note: even without step 1, an attacker cannot directly publish from a PR branch or a fork because OIDC only accepts publishes from `release.yml` on `StackGuardian/add-sg-mcp`'s default branch flow. Tag protection prevents them from triggering the real `release.yml`. Step 1 is belt and braces.
 
 ### Emergency publish when CI is broken
 
 By design you cannot publish from a laptop. The escape hatch:
 
 1. On npmjs.com, **Publishing access** -> flip **"Require two-factor authentication and disallow tokens"** off temporarily.
-2. Create a granular access token with a 7-day expiry scoped to `add-mcp` only.
+2. Create a granular access token with a 7-day expiry scoped to `add-sg-mcp` only.
 3. Publish locally with that token.
 4. Revoke the token immediately.
 5. Flip "Require 2FA and disallow tokens" back on.

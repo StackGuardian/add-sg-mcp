@@ -1,0 +1,8 @@
+add-sg-mcp
+Copyright 2026 StackGuardian
+
+This product is a fork of add-mcp (https://github.com/neon-solutions/add-mcp),
+Copyright Andre Landgraf and contributors, licensed under the Apache License,
+Version 2.0. The agent detection, configuration writers and installer are
+retained from upstream; the StackGuardian login, preset and skills installer
+are additions.

@@ -1,31 +1,38 @@
-# add-mcp
+# add-sg-mcp
 
-A CLI to install MCP servers for different coding agents (Claude Code, Cursor, VS Code, OpenCode, Codex, Grok Build) with a single command.
+A CLI that connects coding agents (Claude Code, Codex, Cursor, VS Code, Gemini CLI, OpenCode and more) to the StackGuardian MCP server and installs the StackGuardian skills. Fork of `neon-solutions/add-mcp` 2.4.0.
+
+## Layout
+
+- `src/sg/` — everything StackGuardian-specific: `preset.ts` (URLs, header, validation), `credentials.ts` (credential store), `auth.ts` (loopback browser login), `skills.ts` (skills installer), `commands.ts` (Commander wiring for the default connect flow, `login`, `logout`, `status`, `remove`), `types.ts`.
+- `src/agents.ts`, `src/installer.ts`, `src/formats/*`, `src/schema.ts`, `src/reader.ts`, `src/opencode-config.ts`, `src/source-parser.ts`, `src/template.ts` — upstream, kept byte-identical so `git merge upstream/main` stays cheap. Do not put StackGuardian logic there.
+- `src/index.ts` — the bin. Upstream's `main()` install flow plus the registration of the `sg` commands (`registerSgCommands`, dependencies injected to avoid an import cycle).
+- `skills/` — the bundled `SKILL.md` folders shipped in the npm package.
+- `install.sh`, `install.ps1` — installers for the standalone executables that `.github/workflows/binaries.yml` builds (`bun run build:binary`) and attaches to each GitHub release.
+- `docs/superpowers/specs/` and `docs/superpowers/plans/` — design and implementation plan.
 
 ## Dev environment
 
-- Use bun as package manager and to run package.json scripts
-- [Fallow](https://github.com/fallow-rs/fallow) is a local dev dependency (`bun run fallow`). It reports unused code, duplication, and complexity across the repo; fix what matters locally and ignore noise when appropriate. It does not run in GitHub Actions.
+- Use bun as package manager and to run package.json scripts.
+- [Fallow](https://github.com/fallow-rs/fallow) is a local dev dependency (`bun run fallow`). It reports unused code, duplication, and complexity; fix what matters locally and ignore noise when appropriate. It does not run in GitHub Actions.
 
 ## Changelog
 
-`CHANGELOG.md` is for **user-facing** changes only: new features and bug fixes that affect people using the CLI. Skip internal-only work (tooling, CI, dev dependencies, refactors with no behavior change). When you ship something that belongs in the changelog, add an entry in the same tone as existing ones and bump `package.json` per semver—often one entry + bump per release batch.
+`CHANGELOG.md` is for **user-facing** changes only. Add an entry in the same tone as existing ones and bump `package.json` per semver.
 
 ## Dev and PR workflow
 
 1. **Branch from up-to-date `main`** — `git checkout main && git pull`.
-2. **Implement the change** — keep the diff focused; match existing style and patterns.
-3. **Tests** — add or extend tests so behavior and edge cases are covered by the spec. Prefer **unit tests without mocks** and **e2e tests without mocks** (this repo’s style).
-4. **Typecheck** — `bun run typecheck`; fix all reported issues.
-5. **Tests** — `bun run test`; fix failures.
-6. **Quality pass** — run `bun run fmt`, then `bun run build`, `bun run typecheck`, and `bun run test` again so formatting, build, types, and tests are all green.
-7. **Fallow** — `bun run fallow` (or `bun run fallow -- --summary`). Address findings that are clearly worth it; not every Fallow warning needs a code change.
-8. **Release notes** — if the change is user-facing (feature or bug fix), add a short `CHANGELOG.md` entry and bump `package.json` per semver; otherwise skip the changelog.
-9. **README** — update only if end users need to know about a new or changed feature.
+2. **Implement the change** — keep the diff focused; match existing style and patterns. StackGuardian changes go in `src/sg/`.
+3. **Tests** — prefer **unit tests without mocks** and **e2e tests without mocks** (hand-rolled `test()` + `node:assert`, run with `tsx`). Every new test file must be added to the `UNIT` or `E2E` list in `tests/run.mjs` — there is no glob. The runner points `HOME` at a throwaway directory because upstream's installer tests write global agent configs in-process.
+4. **Typecheck** — `bun run typecheck`.
+5. **Tests** — `bun run test`.
+6. **Quality pass** — `bun run fmt`, then `bun run build`, `bun run typecheck`, `bun run test`.
+7. **Fallow** — `bun run fallow -- --summary`; address findings that are clearly worth it.
+8. **Release notes** — user-facing change → `CHANGELOG.md` entry + version bump.
+9. **README** — update only if end users need to know.
 10. **PR** — push your branch and open a pull request against `main`.
-
-CI runs registry verification, typecheck, a subset of unit/e2e tests, and build. Keep local runs of the full `test` script green before you rely on CI.
 
 ## Releasing
 
-`add-mcp` ships through a locked-down GitHub Actions pipeline using npm Trusted Publishing (OIDC), provenance attestation, and `npm stage publish` with WebAuthn-gated maintainer approval. **There is no supported `npm publish` from a laptop.** See [docs/RELEASING.md](docs/RELEASING.md) for the one-time setup checklist, per-release runbook, and break-glass procedure.
+Through GitHub Actions with npm Trusted Publishing; see [docs/RELEASING.md](docs/RELEASING.md). No `npm publish` from a laptop.

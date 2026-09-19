@@ -1,8 +1,0 @@
-node_modules/
-.blume/
-dist/
-.astro/
-
-# Vercel
-.vercel/
-.env.local
