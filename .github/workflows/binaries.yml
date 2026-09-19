@@ -2,8 +2,9 @@ name: Binaries
 
 # Standalone executables (no Node.js needed) for macOS, Linux and Windows.
 # Pull requests build and smoke-test them on each OS; a published release,
-# or a manual run with a tag, also attaches them to that GitHub Release with
-# build provenance. The npm package is published separately by release.yml.
+# or a manual run with a tag, also attaches them and install.sh / install.ps1
+# to that GitHub Release with build provenance. The npm package is published
+# separately by release.yml.
 
 on:
   pull_request:
@@ -58,6 +59,9 @@ jobs:
       - name: Install dependencies (no lifecycle scripts)
         run: bun install --frozen-lockfile --ignore-scripts
 
+      - name: Lint install.sh
+        run: shellcheck --shell=sh install.sh
+
       - name: Compile and package every target
         run: |
           set -euo pipefail
@@ -78,7 +82,8 @@ jobs:
               tar -czf "release/add-sg-mcp-$target.tar.gz" -C "$dir" "$exe" LICENSE NOTICE
             fi
           done
-          (cd release && sha256sum add-sg-mcp-* > SHA256SUMS && cat SHA256SUMS)
+          cp install.sh install.ps1 release/
+          (cd release && sha256sum add-sg-mcp-* install.sh install.ps1 > SHA256SUMS && cat SHA256SUMS)
 
       - name: Upload binaries
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -152,6 +157,11 @@ jobs:
           ADD_SG_MCP_BINARY: bin/add-sg-mcp${{ matrix.target == 'windows-x64' && '.exe' || '' }}
         run: bun tests/e2e/sg-binary.test.ts
 
+      - name: Run the install script
+        env:
+          ADD_SG_MCP_RELEASE_DIR: release
+        run: bun tests/e2e/sg-install-script.test.ts
+
   publish:
     name: Attach to release
     needs: smoke
@@ -173,7 +183,7 @@ jobs:
       - name: Attest build provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
-          subject-path: release/add-sg-mcp-*
+          subject-path: release/*
 
       - name: Upload to the release
         env:
