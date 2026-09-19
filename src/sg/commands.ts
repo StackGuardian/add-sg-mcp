@@ -764,7 +764,7 @@ export async function runRemove(
 
   if (!options.yes && isInteractive()) {
     const confirmed = await p.confirm({
-      message: `Remove ${explicitName ? `the ${explicitName} server` : "the StackGuardian MCP server entries"} and the StackGuardian skills from ${targets.length} agent${targets.length === 1 ? "" : "s"} (${scope === "global" ? "user" : "project"} scope)?`,
+      message: `Remove ${explicitName ? `the ${explicitName} server` : "the StackGuardian MCP server entries and the StackGuardian skills"} from ${targets.length} agent${targets.length === 1 ? "" : "s"} (${scope === "global" ? "user" : "project"} scope)?`,
     });
     if (p.isCancel(confirmed) || !confirmed) {
       p.cancel("Cancelled");
@@ -797,15 +797,18 @@ export async function runRemove(
       }
     }
   }
-  const skills = removeSkills(targets, scope, process.cwd());
-  if (skills.removed.length > 0) {
-    lines.push(
-      `${chalk.green("✓")} skills: removed ${skills.removed.length} entr${skills.removed.length === 1 ? "y" : "ies"}`,
-    );
-  }
-  for (const error of skills.errors) {
-    failures++;
-    lines.push(`${chalk.red("✗")} skills: ${chalk.dim(error)}`);
+  // --name drops one organization's entry; the skills stay for the others.
+  if (!explicitName) {
+    const skills = removeSkills(targets, scope, process.cwd());
+    if (skills.removed.length > 0) {
+      lines.push(
+        `${chalk.green("✓")} skills: removed ${skills.removed.length} entr${skills.removed.length === 1 ? "y" : "ies"}`,
+      );
+    }
+    for (const error of skills.errors) {
+      failures++;
+      lines.push(`${chalk.red("✗")} skills: ${chalk.dim(error)}`);
+    }
   }
   if (lines.length > 0) p.note(lines.join("\n"), "Removed");
   else p.log.info("Nothing to remove.");
@@ -929,7 +932,7 @@ export function registerSgCommands(
     .option("--project", "Project scope instead of user scope")
     .option(
       "-n, --name <name>",
-      `Only this server entry (default: every ${SG_SERVER_NAME_PREFIX}-<org> entry)`,
+      `Only this server entry, keeping the skills (default: every ${SG_SERVER_NAME_PREFIX}-<org> entry and the skills)`,
     )
     .option("-y, --yes", "Do not ask for confirmation")
     .action(async (_options: unknown, command: Command) => {

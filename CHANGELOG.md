@@ -10,6 +10,7 @@ First release of `add-sg-mcp`, a StackGuardian-specific fork of `add-mcp` 2.4.0.
 - Default scope is the user profile; `--project` opts into project files and adds them to `.gitignore`.
 - `--auth grant` obtains an OAuth grant token (authorization code + PKCE) from the StackGuardian broker: you approve an organization, roles and an expiry in the browser, and each agent gets an `Authorization: Bearer sgm_…` header. `status` shows the expiry, an expired grant is never reused, and grants are revoked from _Profile → Connected apps_.
 - `--auth oauth` (preview) writes a credential-less entry for agents with built-in MCP OAuth.
+- Standalone executables for macOS (arm64, x64), Linux (x64, arm64) and Windows (x64) are attached to every GitHub release, so `add-sg-mcp` runs without Node.js. `curl -fsSL …/install.sh | sh` (macOS, Linux) and `irm …/install.ps1 | iex` (Windows) download the right one, verify its checksum, install it and run it. Each release carries `SHA256SUMS` and build provenance attestations.
 - Removed the registry site, `find`/`search`, `list` and `sync` commands from upstream.
 
 ## Upstream history (add-mcp)
