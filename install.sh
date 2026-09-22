@@ -98,7 +98,11 @@ main() {
 
   if [ "${ADD_SG_MCP_NO_RUN:-}" = 1 ]; then return 0; fi
   # Under `curl | sh` stdin is this script; give add-sg-mcp the terminal for its prompts.
-  if [ ! -t 0 ] && (: </dev/tty) 2>/dev/null; then
+  # Open it by its device name, read-write: the Bun runtime on macOS reads no keys
+  # from /dev/tty, and the prompts write to stdin.
+  if [ ! -t 0 ] && term=$(tty <&2 2>/dev/null) && (: <>"$term") 2>/dev/null; then
+    "$dir/add-sg-mcp" "$@" <>"$term"
+  elif [ ! -t 0 ] && (: </dev/tty) 2>/dev/null; then
     "$dir/add-sg-mcp" "$@" </dev/tty
   else
     "$dir/add-sg-mcp" "$@"
