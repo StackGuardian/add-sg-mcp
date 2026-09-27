@@ -136,10 +136,12 @@ function runInstallerInTerminal(from: string, installDir: string) {
     process.platform === "darwin"
       ? 'cat | script -q /dev/null sh -c "$1"'
       : 'cat | script -q -e -c "$1" /dev/null';
-  // Detached, so the whole process group can be killed afterwards.
+  // Detached, so the whole process group can be killed afterwards. CI is
+  // cleared because add-sg-mcp skips its prompts when it is set, and this
+  // test is about the prompts.
   return spawn("sh", ["-c", script, "sh", command], {
     cwd: createTempDir(),
-    env: installerEnv(from, installDir),
+    env: { ...installerEnv(from, installDir), CI: "" },
     detached: true,
   });
 }
