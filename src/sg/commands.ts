@@ -38,7 +38,7 @@ import {
   type SgCredentials,
 } from "./credentials.js";
 import { LoginError, loginViaBrowser } from "./auth.js";
-import { loginViaGrant } from "./oauth.js";
+import { loginViaGrant, revokeGrant } from "./oauth.js";
 import {
   SG_SKILL_NAMES,
   installSkills,
@@ -678,6 +678,13 @@ export async function runLogout(
   deps.showLogo();
   console.log();
   const saved = readCredentials();
+  // A grant is this install's alone, so logging out ends it on the server too. The saved
+  // API base is checked like any other: the token only ever goes to a StackGuardian host.
+  const revoked =
+    saved?.authType === "grant" &&
+    saved.accessToken !== undefined &&
+    isAllowedApiBase(saved.apiBase, ["localhost", "127.0.0.1"]) &&
+    (await revokeGrant(saved.apiBase, saved.accessToken, saved.org));
   const removed = deleteCredentials();
   p.log[removed ? "success" : "info"](
     removed
@@ -689,7 +696,9 @@ export async function runLogout(
   }
   p.outro(
     saved?.authType === "grant"
-      ? "The grant stays active until you revoke it from Profile → Connected apps."
+      ? revoked
+        ? "The grant was revoked."
+        : "The grant could not be revoked: it stays active until you revoke it from Profile → Connected apps."
       : "The API key itself stays valid; rotate it from Profile → API keys in the dashboard if needed.",
   );
 }

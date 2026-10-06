@@ -10,6 +10,7 @@ import {
   exchangeCode,
   generatePkce,
   loginViaGrant,
+  revokeGrant,
   startCodeCallbackServer,
 } from "../src/sg/oauth.js";
 import { LoginError } from "../src/sg/auth.js";
@@ -384,6 +385,41 @@ await test("exchangeCode rejects a response without a usable token or organizati
     (err: unknown) =>
       err instanceof OAuthError && err.error === "invalid_response",
   );
+});
+
+await test("revokeGrant posts the token and its organization to the revocation endpoint", async () => {
+  const calls: Array<{ url: string; method?: string; body: string }> = [];
+  const fetchImpl = (async (url: string, init: RequestInit) => {
+    calls.push({ url, method: init.method, body: String(init.body) });
+    return new Response("{}", { status: 200 });
+  }) as unknown as typeof fetch;
+  assert.strictEqual(
+    await revokeGrant(QA_API, TOKEN, "demo-org", fetchImpl),
+    true,
+  );
+  assert.strictEqual(
+    calls[0]?.url,
+    "https://testapi.qa.stackguardian.io/api/v1/oauth/revoke/",
+  );
+  assert.strictEqual(calls[0]?.method, "POST");
+  const form = new URLSearchParams(calls[0]?.body ?? "");
+  assert.deepStrictEqual(Object.fromEntries(form), {
+    token: TOKEN,
+    org: "demo-org",
+  });
+});
+
+await test("revokeGrant reports a refusal or an unreachable server instead of throwing", async () => {
+  const refused = (async () =>
+    new Response("Forbidden", { status: 403 })) as unknown as typeof fetch;
+  assert.strictEqual(
+    await revokeGrant(QA_API, TOKEN, "demo-org", refused),
+    false,
+  );
+  const down = (async () => {
+    throw new TypeError("fetch failed");
+  }) as unknown as typeof fetch;
+  assert.strictEqual(await revokeGrant(QA_API, TOKEN, "demo-org", down), false);
 });
 
 await test("loginViaGrant runs the whole flow and returns the grant", async () => {

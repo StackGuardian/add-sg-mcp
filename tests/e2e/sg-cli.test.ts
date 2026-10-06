@@ -385,7 +385,11 @@ test("preset-excluded agents and bad inputs fail clearly", () => {
 
 const GRANT = "sgm_testtesttest1234";
 
-function writeGrant(home: string, expiresAt: string | null): void {
+function writeGrant(
+  home: string,
+  expiresAt: string | null,
+  apiBase = "https://api.app.stackguardian.io/api/v1",
+): void {
   const dir = join(home, ".config", "add-sg-mcp");
   mkdirSync(dir, { recursive: true });
   writeFileSync(
@@ -393,7 +397,7 @@ function writeGrant(home: string, expiresAt: string | null): void {
     JSON.stringify({
       version: 1,
       current: {
-        apiBase: "https://api.app.stackguardian.io/api/v1",
+        apiBase,
         dashboardUrl: "https://app.stackguardian.io",
         org: "demo-org",
         obtainedAt: "2026-09-16T12:00:00.000Z",
@@ -429,9 +433,34 @@ test("a saved grant is shown by status but never reused as an API key", () => {
   );
   assert.ok(!output.includes("sgm_"), "the grant token must never be printed");
   assert.strictEqual(existsSync(join(home, ".claude.json")), false);
+});
+
+test("logout forgets a grant even when it cannot be revoked, and says it is still active", () => {
+  const home = createTempDir();
+  const project = createTempDir();
+  // Nothing listens here, so the revocation fails at once and never leaves the machine.
+  writeGrant(home, null, "https://127.0.0.1:9/api/v1");
 
   const logout = expectOk(runCli(["logout"], project, home));
-  assert.match(logout, /Connected apps/);
+  assert.match(logout, /Removed .*credentials\.json/);
+  assert.match(
+    logout,
+    /could not be revoked.*revoke it from Profile → Connected apps/s,
+  );
+  assert.ok(!logout.includes("sgm_"), "the grant token must never be printed");
+  assert.strictEqual(
+    existsSync(join(home, ".config", "add-sg-mcp", "credentials.json")),
+    false,
+  );
+});
+
+test("logout does not send a grant to a host that is not StackGuardian's", () => {
+  const home = createTempDir();
+  const project = createTempDir();
+  writeGrant(home, null, "https://example.invalid/api/v1");
+
+  const logout = expectOk(runCli(["logout"], project, home));
+  assert.match(logout, /could not be revoked/);
 });
 
 test("--auth grant installs a live grant as a Bearer header and re-logs in when it expired", () => {

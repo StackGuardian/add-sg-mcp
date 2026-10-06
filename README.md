@@ -94,7 +94,7 @@ Use a grant token when an agent should be able to do less than you can.
 
 - The token is bound to **one organization and the roles you approved** — it is not your full user key, so an agent can be given less than you have.
 - `npx add-sg-mcp status` shows `expires <date>`, `no expiry` or `expired`. An expired grant is never reused; the next run asks for a new one.
-- Revoke a grant any time from _Profile → Connected apps_ in the dashboard. `logout` only deletes the local copy.
+- `logout` revokes the saved grant and deletes the local copy. Revoke a grant any time from _Profile → Connected apps_ in the dashboard.
 - `npx add-sg-mcp login --auth grant` requests a fresh grant without touching agent configs.
 
 ### OAuth (preview)
@@ -241,7 +241,7 @@ Claude Code, Codex, Cursor, VS Code (Copilot), Gemini CLI, OpenCode, GitHub Copi
 
 - On Windows there is no `0600` equivalent; the file relies on the ACL of your profile folder.
 - With `--auth apikey` (the default) the credential is your **user API key for the selected organization**: it acts as you, with your roles, and it does not expire on its own. Rotate it from _Profile → API keys_ in the dashboard if a machine is lost.
-- With `--auth grant` the credential is a **grant token bound to one organization and the roles you approved**, and it can carry an expiry. Revoke it from _Profile → Connected apps_. In both cases `logout` only deletes the local copy — it never invalidates the credential.
+- With `--auth grant` the credential is a **grant token bound to one organization and the roles you approved**, and it can carry an expiry. `logout` revokes it; you can also revoke it from _Profile → Connected apps_. For an API key `logout` only deletes the local copy — it never invalidates the key.
 - By default nothing is written into project directories. `--project` warns and adds the generated files to `.gitignore`.
 - The CLI accepts a callback only when its one-time `state` matches, and only API hosts under `stackguardian.io` (or the host you passed with `--dashboard-url`).
 - `status` never prints the key or the grant token in full; the callback page strips the credential from the browser history, and a grant flow keeps its PKCE verifier off the front channel (only the one-time code travels through the browser).
