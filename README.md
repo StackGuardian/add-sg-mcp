@@ -90,7 +90,7 @@ Use a grant token when an agent should be able to do less than you can.
 
 ### Grant tokens
 
-`npx add-sg-mcp --auth grant --region eu` (optionally `--org my-org`) asks the StackGuardian OAuth broker for a **grant token** instead of using your API key. The browser opens a consent page where you pick the organization, the roles the agent may use and how long the grant should last; the CLI receives an `sgm_` token on a loopback callback and writes it to each agent as an `Authorization: Bearer` header.
+`npx add-sg-mcp --auth grant --region eu` (optionally `--org my-org`) asks the StackGuardian OAuth broker for a **grant token** instead of using your API key. The browser opens a consent page where you pick the organization, the roles the agent may use and how long the grant should last; the CLI receives an `sgat_` token on a loopback callback and writes it to each agent as an `Authorization: Bearer` header.
 
 - The token is bound to **one organization and the roles you approved** — it is not your full user key, so an agent can be given less than you have.
 - `npx add-sg-mcp status` shows `expires <date>`, `no expiry` or `expired`. An expired grant is never reused; the next run asks for a new one.

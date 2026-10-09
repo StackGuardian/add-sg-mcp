@@ -77,7 +77,7 @@ function startTokenServer(
 const QA_API = "https://testapi.qa.stackguardian.io/api/v1";
 const QA_DASHBOARD = "https://dash.qa.stackguardian.io";
 const CLIENT_ID = `${QA_DASHBOARD}/.well-known/oauth-clients/add-sg-mcp.json`;
-const TOKEN = "sgm_testtesttest1234";
+const TOKEN = "sgat_testtesttest1234";
 const REQ = { code: "c", verifier: "v", clientId: "i", redirectUri: "r" };
 
 await test("the client identity is the hosted metadata document URL", async () => {
@@ -284,8 +284,8 @@ await test("exchangeCode rejects a token or a token_type it cannot use", async (
         { status: 200 },
       )) as unknown as typeof fetch;
   for (const extra of [
-    { access_token: "sgm_short" },
-    { access_token: "sgm_has space aaaaaaaaaaaa" },
+    { access_token: "sgat_short" },
+    { access_token: "sgat_has space aaaaaaaaaaaa" },
     { token_type: "mac" },
     { token_type: undefined },
   ]) {

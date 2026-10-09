@@ -142,8 +142,8 @@ test("buildAuthHeader picks the scheme from the credential", () => {
     "Authorization: apikey sgu_abc",
   );
   assert.strictEqual(
-    buildAuthHeader({ authType: "grant", accessToken: "sgm_abc" }),
-    "Authorization: Bearer sgm_abc",
+    buildAuthHeader({ authType: "grant", accessToken: "sgat_abc" }),
+    "Authorization: Bearer sgat_abc",
   );
 });
 
