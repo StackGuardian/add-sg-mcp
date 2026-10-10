@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1
+
+- Fix `curl -fsSL …/install.sh | sh` on macOS. The installer now hands `add-sg-mcp` the terminal by its device name, so the prompts read the keyboard. Before, a key pressed during the download made `add-sg-mcp` exit silently at its first prompt, and otherwise that prompt ignored every key.
+
 ## 0.1.0 — StackGuardian fork
 
 First release of `add-sg-mcp`, a StackGuardian-specific fork of `add-mcp` 2.4.0.

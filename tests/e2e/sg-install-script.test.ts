@@ -2,7 +2,7 @@
 // Runs install.sh (install.ps1 on Windows) against release files served over
 // file://, the way `curl … | sh` runs it against a GitHub release.
 import assert from "node:assert";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   cpSync,
@@ -15,14 +15,15 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { stripVTControlCharacters } from "node:util";
 
 let passed = 0;
 let failed = 0;
 const tempDirs: string[] = [];
 
-function test(name: string, fn: () => void) {
+async function test(name: string, fn: () => void | Promise<void>) {
   try {
-    fn();
+    await fn();
     console.log(`✓ ${name}`);
     passed++;
   } catch (err) {
@@ -79,6 +80,16 @@ const release = process.env.ADD_SG_MCP_RELEASE_DIR
   ? resolve(process.env.ADD_SG_MCP_RELEASE_DIR)
   : buildRelease();
 
+function installerEnv(from: string, installDir: string) {
+  return {
+    ...process.env,
+    ADD_SG_MCP_DOWNLOAD_URL: pathToFileURL(from).href,
+    ADD_SG_MCP_INSTALL_DIR: installDir,
+    ADD_SG_MCP_VERSION: "",
+    ADD_SG_MCP_NO_RUN: "",
+  };
+}
+
 function runInstaller(
   from: string,
   installDir: string,
@@ -88,14 +99,7 @@ function runInstaller(
   const spawnOptions = {
     cwd: createTempDir(),
     encoding: "utf-8" as const,
-    env: {
-      ...process.env,
-      ADD_SG_MCP_DOWNLOAD_URL: pathToFileURL(from).href,
-      ADD_SG_MCP_INSTALL_DIR: installDir,
-      ADD_SG_MCP_VERSION: "",
-      ADD_SG_MCP_NO_RUN: "",
-      ...options.env,
-    },
+    env: { ...installerEnv(from, installDir), ...options.env },
   };
   if (windows) {
     return spawnSync(
@@ -120,11 +124,42 @@ function runInstaller(
     : spawnSync("sh", [script, ...args], spawnOptions);
 }
 
+/**
+ * Runs `sh -s < install.sh` in a pseudo-terminal from script(1), the way
+ * `curl … | sh` runs in a terminal: stdin is the script, the terminal is not.
+ */
+function runInstallerInTerminal(from: string, installDir: string) {
+  // A new pty is 0 columns wide, which wraps every prompt character.
+  const command = `stty cols 100 rows 30; sh -s < '${join(repoRoot, "install.sh")}'`;
+  // macOS script(1) rejects a socket as stdin, so `cat` hands it a pipe.
+  const script =
+    process.platform === "darwin"
+      ? 'cat | script -q /dev/null sh -c "$1"'
+      : 'cat | script -q -e -c "$1" /dev/null';
+  // Detached, so the whole process group can be killed afterwards. CI is
+  // cleared because add-sg-mcp skips its prompts when it is set, and this
+  // test is about the prompts.
+  return spawn("sh", ["-c", script, "sh", command], {
+    cwd: createTempDir(),
+    env: { ...installerEnv(from, installDir), CI: "" },
+    detached: true,
+  });
+}
+
+async function waitFor(check: () => boolean, ms: number): Promise<boolean> {
+  const deadline = Date.now() + ms;
+  while (!check()) {
+    if (Date.now() > deadline) return false;
+    await new Promise((done) => setTimeout(done, 50));
+  }
+  return true;
+}
+
 function describe(result: ReturnType<typeof spawnSync>): string {
   return `exit ${result.status}\nSTDOUT:\n${result.stdout}\nSTDERR:\n${result.stderr}`;
 }
 
-test("installs the binary for this machine and runs it with the given flags", () => {
+await test("installs the binary for this machine and runs it with the given flags", () => {
   const installDir = join(createTempDir(), "bin");
   const result = runInstaller(release, installDir, ["--version"]);
   assert.strictEqual(result.status, 0, describe(result));
@@ -133,7 +168,7 @@ test("installs the binary for this machine and runs it with the given flags", ()
 });
 
 if (!windows) {
-  test("piped into sh (curl | sh -s -- …) it passes the flags through", () => {
+  await test("piped into sh (curl | sh -s -- …) it passes the flags through", () => {
     const installDir = join(createTempDir(), "bin");
     const result = runInstaller(release, installDir, ["--version"], {
       piped: true,
@@ -141,9 +176,35 @@ if (!windows) {
     assert.strictEqual(result.status, 0, describe(result));
     assert.match(String(result.stdout), new RegExp(`^${version}$`, "m"));
   });
+
+  await test("piped into sh in a terminal, the prompts read the keyboard", async () => {
+    const child = runInstallerInTerminal(release, join(createTempDir(), "bin"));
+    let output = "";
+    child.stdout.on("data", (chunk: Buffer) => (output += chunk.toString()));
+    const screen = () => stripVTControlCharacters(output);
+    try {
+      // A key typed while the download runs is waiting when the prompt starts.
+      child.stdin.write("a");
+      assert.ok(
+        await waitFor(() => screen().includes("Where is your"), 30_000),
+        `no region prompt:\n${screen()}`,
+      );
+      child.stdin.write("\x1b");
+      assert.ok(
+        await waitFor(() => screen().includes("Cancelled"), 10_000),
+        `Esc did not cancel the prompt:\n${screen()}`,
+      );
+    } finally {
+      try {
+        if (child.pid) process.kill(-child.pid, "SIGKILL");
+      } catch {
+        // ESRCH: everything already exited.
+      }
+    }
+  });
 }
 
-test("ADD_SG_MCP_NO_RUN=1 installs without running add-sg-mcp", () => {
+await test("ADD_SG_MCP_NO_RUN=1 installs without running add-sg-mcp", () => {
   const installDir = join(createTempDir(), "bin");
   const run = runInstaller(release, installDir, ["--not-a-real-flag"]);
   assert.notStrictEqual(run.status, 0, "an unknown flag fails when it runs");
@@ -157,7 +218,7 @@ test("ADD_SG_MCP_NO_RUN=1 installs without running add-sg-mcp", () => {
   assert.strictEqual(installOnly.status, 0, describe(installOnly));
 });
 
-test("a checksum mismatch aborts before anything is installed", () => {
+await test("a checksum mismatch aborts before anything is installed", () => {
   const tampered = createTempDir();
   cpSync(release, tampered, { recursive: true });
   writeFileSync(
