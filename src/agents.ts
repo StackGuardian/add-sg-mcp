@@ -16,6 +16,9 @@ function getGrokHome(): string {
   return process.env.GROK_HOME || defaultGrokHome;
 }
 
+/** Copilot CLI reads `$COPILOT_HOME`, defaulting to `~/.copilot`. It ignores `XDG_CONFIG_HOME`. */
+const copilotHome = process.env.COPILOT_HOME || join(home, ".copilot");
+
 function getKimiCodeHome(): string {
   return process.env.KIMI_CODE_HOME || join(home, ".kimi-code");
 }
@@ -89,10 +92,6 @@ const clineExtensionConfigPath = join(
   "saoudrizwan.claude-dev",
   "settings",
   "cline_mcp_settings.json",
-);
-const copilotConfigPath = join(
-  process.env.XDG_CONFIG_HOME || join(home, ".copilot"),
-  "mcp-config.json",
 );
 /**
  * Kilo Code's VS Code extension storage, used for detection only. The
@@ -1037,7 +1036,7 @@ export const agents: Record<AgentType, AgentConfig> = {
   "github-copilot-cli": {
     name: "github-copilot-cli",
     displayName: "GitHub Copilot CLI",
-    configPath: copilotConfigPath,
+    configPath: join(copilotHome, "mcp-config.json"),
     localConfigPath: ".mcp.json",
     projectDetectPaths: [".mcp.json", ".github/mcp.json"],
     configKey: "mcpServers",
@@ -1045,7 +1044,7 @@ export const agents: Record<AgentType, AgentConfig> = {
     supportedTransports: ["stdio", "http", "sse"],
     supportedFields: [],
     detectGlobalInstall: async () => {
-      return existsSync(dirname(copilotConfigPath));
+      return existsSync(copilotHome);
     },
     resolveConfigPath: resolveGitHubCopilotCliConfigPath,
     transformConfig: transformGitHubCopilotCliConfig,

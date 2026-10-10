@@ -1,23 +1,8 @@
 # Changelog
 
-## 1.0.1
+## [2.4.1] - 2026-09-29
 
-- Fix `curl -fsSL …/install.sh | sh` on macOS. The installer now hands `add-sg-mcp` the terminal by its device name, so the prompts read the keyboard. Before, a key pressed during the download made `add-sg-mcp` exit silently at its first prompt, and otherwise that prompt ignored every key.
-
-## 0.1.0 — StackGuardian fork
-
-First release of `add-sg-mcp`, a StackGuardian-specific fork of `add-mcp` 2.4.0.
-
-- `npx add-sg-mcp` signs in through the StackGuardian dashboard (organization picker, loopback callback), stores the organization API key locally and installs the StackGuardian MCP server (one `StackGuardian-<org>` entry per organization) into every selected coding agent.
-- Installs the StackGuardian skills (`sg-create-workflow`, `sg-update-workflow`, `sg-upgrade-workflow`) into each agent's skills directory via a shared `~/.agents/skills` copy.
-- New commands: `login`, `logout [--purge]`, `status`, `remove`. Headless mode with `--token`/`SG_API_KEY`.
-- Default scope is the user profile; `--project` opts into project files and adds them to `.gitignore`.
-- `--auth grant` obtains an OAuth grant token (authorization code + PKCE) from the StackGuardian broker: you approve an organization, roles and an expiry in the browser, and each agent gets an `Authorization: Bearer sgat_…` header. `status` shows the expiry, an expired grant is never reused, and grants are revoked from _Profile → Connected apps_.
-- `--auth oauth` (preview) writes a credential-less entry for agents with built-in MCP OAuth.
-- Standalone executables for macOS (arm64, x64), Linux (x64, arm64) and Windows (x64) are attached to every GitHub release, so `add-sg-mcp` runs without Node.js. `curl -fsSL …/install.sh | sh` (macOS, Linux) and `irm …/install.ps1 | iex` (Windows) download the right one, verify its checksum, install it and run it. Each release carries `SHA256SUMS` and build provenance attestations.
-- Removed the registry site, `find`/`search`, `list` and `sync` commands from upstream.
-
-## Upstream history (add-mcp)
+- fix GitHub Copilot CLI global installs and detection to use `$COPILOT_HOME` (default `~/.copilot`), the directory Copilot CLI reads. With `XDG_CONFIG_HOME` set, add-mcp wrote `$XDG_CONFIG_HOME/mcp-config.json`, which Copilot CLI never loads, and detected Copilot CLI whenever that directory existed. An existing `$XDG_CONFIG_HOME/mcp-config.json` is left untouched; rerun the install to write the Copilot CLI path. Global `list` and `remove` now read the corrected path, so entries that exist only in the old file no longer show up there.
 
 ## [2.4.0] - 2026-09-07
 
