@@ -16,6 +16,7 @@ import { join, isAbsolute } from "node:path";
 import {
   SG_SKILL_NAMES,
   bundledSkillsDir,
+  extractEmbeddedSkills,
   canonicalSkillsDir,
   agentSkillsDir,
   installSkills,
@@ -235,5 +236,51 @@ test("skillsStatus reports per-agent presence and removeSkills only touches our 
 });
 
 for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
+test("embedded skills are extracted to a private directory mirroring skills/", () => {
+  const root = mkdtempSync(join(tmpdir(), "add-sg-mcp-embedded-root-"));
+  tempDirs.push(root);
+  mkdirSync(join(root, "skills", "sg-create-workflow", "references"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(root, "skills", "sg-create-workflow", "SKILL.md"),
+    "# create ✓\n",
+  );
+  writeFileSync(
+    join(root, "skills", "sg-create-workflow", "references", "inputs.md"),
+    "inputs\n",
+  );
+  writeFileSync(join(root, "index.js"), "bundle");
+
+  const dir = extractEmbeddedSkills(root, [
+    "index.js",
+    "skills/sg-create-workflow/SKILL.md",
+    "skills/sg-create-workflow/references/inputs.md",
+  ]);
+  assert.ok(dir, "a directory is returned");
+  tempDirs.push(dir);
+  assert.notStrictEqual(dir, join(root, "skills"));
+  assert.strictEqual(
+    readFileSync(join(dir, "sg-create-workflow", "SKILL.md"), "utf-8"),
+    "# create ✓\n",
+  );
+  assert.strictEqual(
+    readFileSync(
+      join(dir, "sg-create-workflow", "references", "inputs.md"),
+      "utf-8",
+    ),
+    "inputs\n",
+  );
+  assert.ok(!existsSync(join(dir, "index.js")), "non-skill files are ignored");
+  if (process.platform !== "win32") {
+    assert.strictEqual(lstatSync(dir).mode & 0o777, 0o700);
+  }
+});
+
+test("without embedded skills nothing is extracted", () => {
+  assert.strictEqual(extractEmbeddedSkills(tmpdir(), []), undefined);
+  assert.strictEqual(extractEmbeddedSkills(tmpdir(), ["index.js"]), undefined);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

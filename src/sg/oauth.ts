@@ -296,6 +296,36 @@ export async function exchangeCode(
   };
 }
 
+/**
+ * RFC 7009 revocation of the grant behind a token. Best effort: false when the server
+ * refused or could not be reached, so the caller can say the grant is still active.
+ */
+export async function revokeGrant(
+  apiBase: string,
+  token: string,
+  org: string,
+  fetchImpl: typeof fetch = fetch,
+  timeoutMs: number = TOKEN_TIMEOUT_MS,
+): Promise<boolean> {
+  try {
+    const res = await fetchImpl(`${trimBase(apiBase)}/oauth/revoke/`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        accept: "application/json",
+      },
+      // The hash that finds a grant is salted with its organization.
+      body: new URLSearchParams({ token, org }).toString(),
+      // A redirect would re-send the token to wherever it points.
+      redirect: "error",
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export interface GrantLoginOptions {
   apiBase: string;
   dashboardUrl: string;

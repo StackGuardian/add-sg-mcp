@@ -57,7 +57,7 @@ const grant: SgCredentials = {
   org: "demo-org",
   obtainedAt: "2026-09-16T12:00:00.000Z",
   authType: "grant",
-  accessToken: "sgm_abcdefghijklmnop",
+  accessToken: "sgat_abcdefghijklmnop",
   expiresAt: null,
 };
 
