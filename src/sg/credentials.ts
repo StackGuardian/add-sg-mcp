@@ -19,7 +19,7 @@ export interface SgCredentials {
   dashboardUrl: string;
   org: string;
   obtainedAt: string;
-  /** `apikey` is the sgu_ key from the dashboard, `grant` the sgm_ token from the OAuth broker. */
+  /** `apikey` is the sgu_ key from the dashboard, `grant` the sgat_ token from the OAuth broker. */
   authType: "apikey" | "grant";
   /** Set for `apikey`. */
   apiKey?: string;

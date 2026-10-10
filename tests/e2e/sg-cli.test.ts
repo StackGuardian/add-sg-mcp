@@ -383,9 +383,13 @@ test("preset-excluded agents and bad inputs fail clearly", () => {
   assert.strictEqual(existsSync(join(freshHome, ".claude.json")), false);
 });
 
-const GRANT = "sgm_testtesttest1234";
+const GRANT = "sgat_testtesttest1234";
 
-function writeGrant(home: string, expiresAt: string | null): void {
+function writeGrant(
+  home: string,
+  expiresAt: string | null,
+  apiBase = "https://api.app.stackguardian.io/api/v1",
+): void {
   const dir = join(home, ".config", "add-sg-mcp");
   mkdirSync(dir, { recursive: true });
   writeFileSync(
@@ -393,7 +397,7 @@ function writeGrant(home: string, expiresAt: string | null): void {
     JSON.stringify({
       version: 1,
       current: {
-        apiBase: "https://api.app.stackguardian.io/api/v1",
+        apiBase,
         dashboardUrl: "https://app.stackguardian.io",
         org: "demo-org",
         obtainedAt: "2026-09-16T12:00:00.000Z",
@@ -411,7 +415,7 @@ test("a saved grant is shown by status but never reused as an API key", () => {
   writeGrant(home, "2099-01-01T00:00:00.000Z");
 
   const status = expectOk(runCli(["status"], project, home));
-  assert.match(status, /Grant token: sgm_…1234/);
+  assert.match(status, /Grant token: sgat…1234/);
   assert.match(status, /Validity: expires/);
 
   // Default (apikey) mode must ignore the grant and ask for a sign-in instead.
@@ -427,11 +431,36 @@ test("a saved grant is shown by status but never reused as an API key", () => {
     output,
     /The saved grant for demo-org will be replaced; it stays active until you revoke it from Profile → Connected apps\./,
   );
-  assert.ok(!output.includes("sgm_"), "the grant token must never be printed");
+  assert.ok(!output.includes("sgat_"), "the grant token must never be printed");
   assert.strictEqual(existsSync(join(home, ".claude.json")), false);
+});
+
+test("logout forgets a grant even when it cannot be revoked, and says it is still active", () => {
+  const home = createTempDir();
+  const project = createTempDir();
+  // Nothing listens here, so the revocation fails at once and never leaves the machine.
+  writeGrant(home, null, "https://127.0.0.1:9/api/v1");
 
   const logout = expectOk(runCli(["logout"], project, home));
-  assert.match(logout, /Connected apps/);
+  assert.match(logout, /Removed .*credentials\.json/);
+  assert.match(
+    logout,
+    /could not be revoked.*revoke it from Profile → Connected apps/s,
+  );
+  assert.ok(!logout.includes("sgat_"), "the grant token must never be printed");
+  assert.strictEqual(
+    existsSync(join(home, ".config", "add-sg-mcp", "credentials.json")),
+    false,
+  );
+});
+
+test("logout does not send a grant to a host that is not StackGuardian's", () => {
+  const home = createTempDir();
+  const project = createTempDir();
+  writeGrant(home, null, "https://example.invalid/api/v1");
+
+  const logout = expectOk(runCli(["logout"], project, home));
+  assert.match(logout, /could not be revoked/);
 });
 
 test("--auth grant installs a live grant as a Bearer header and re-logs in when it expired", () => {
@@ -455,7 +484,7 @@ test("--auth grant installs a live grant as a Bearer header and re-logs in when 
     ),
   );
   assert.match(output, /Using the saved grant for demo-org/);
-  assert.ok(!output.includes("sgm_"), "the grant token must never be printed");
+  assert.ok(!output.includes("sgat_"), "the grant token must never be printed");
   const claude = JSON.parse(
     readFileSync(join(home, ".claude.json"), "utf-8"),
   ) as {
