@@ -11,6 +11,3 @@ directory name.
 | `sg-update-workflow`  | Guided settings changes with `update_workflow`                          |
 | `sg-upgrade-workflow` | Guided template-revision upgrade with `update_workflow` (dry-run first) |
 
-Source of truth for the text is this directory. The same skills live in the
-MCP server repo (`sg-clickhouse-mcp/.claude/skills`, unprefixed) for local
-development; keep them in sync when the tools change.
