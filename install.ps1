@@ -1,9 +1,9 @@
 # Installs the add-sg-mcp standalone executable on Windows (no Node.js needed) and runs it.
 #
-#   irm https://github.com/StackGuardian/add-sg-mcp/releases/latest/download/install.ps1 | iex
-#   & ([scriptblock]::Create((irm https://github.com/StackGuardian/add-sg-mcp/releases/latest/download/install.ps1))) --region eu -a claude-code
+#   irm https://dl.stackguardian.io/add-sg-mcp/install.ps1 | iex
+#   & ([scriptblock]::Create((irm https://dl.stackguardian.io/add-sg-mcp/install.ps1))) --region eu -a claude-code
 #
-# ADD_SG_MCP_VERSION       release to install, e.g. v0.2.0 (default: latest)
+# ADD_SG_MCP_VERSION       release to install, e.g. v1.0.4 (default: latest)
 # ADD_SG_MCP_INSTALL_DIR   install directory (default: %LOCALAPPDATA%\add-sg-mcp\bin, added to your user PATH)
 # ADD_SG_MCP_DOWNLOAD_URL  base URL serving the release files, e.g. an internal mirror or a file:// share
 # ADD_SG_MCP_NO_RUN=1      install only; do not run add-sg-mcp afterwards
@@ -12,9 +12,9 @@
 & {
   $ErrorActionPreference = 'Stop'
   $ProgressPreference = 'SilentlyContinue'
-  # Windows PowerShell 5.1 may still default to TLS 1.0, which GitHub refuses.
+  # Windows PowerShell 5.1 may still default to TLS 1.0, which the download host refuses.
   [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-  $releases = 'https://github.com/StackGuardian/add-sg-mcp/releases'
+  $downloads = 'https://dl.stackguardian.io/add-sg-mcp'
 
   function Save-Url($url, $path) {
     $uri = [Uri]$url
@@ -25,9 +25,6 @@
   $cpu = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
   if ($cpu -ne 'AMD64') { throw "add-sg-mcp: no build for $cpu Windows; run: npx add-sg-mcp" }
   $archive = 'add-sg-mcp-windows-x64.zip'
-  $base = if ($env:ADD_SG_MCP_DOWNLOAD_URL) { $env:ADD_SG_MCP_DOWNLOAD_URL.TrimEnd('/') }
-  elseif ($env:ADD_SG_MCP_VERSION) { "$releases/download/v$($env:ADD_SG_MCP_VERSION.TrimStart('v'))" }
-  else { "$releases/latest/download" }
   $defaultDir = Join-Path $env:LOCALAPPDATA 'add-sg-mcp\bin'
   $dir = if ($env:ADD_SG_MCP_INSTALL_DIR) { $env:ADD_SG_MCP_INSTALL_DIR } else { $defaultDir }
   $exe = Join-Path $dir 'add-sg-mcp.exe'
@@ -35,6 +32,19 @@
   $tmp = Join-Path ([IO.Path]::GetTempPath()) "add-sg-mcp-$([guid]::NewGuid())"
   New-Item -ItemType Directory -Path $tmp | Out-Null
   try {
+    if ($env:ADD_SG_MCP_DOWNLOAD_URL) { $base = $env:ADD_SG_MCP_DOWNLOAD_URL.TrimEnd('/') }
+    else {
+      $version = $env:ADD_SG_MCP_VERSION
+      if (-not $version) {
+        # A one-line file naming the newest release, e.g. v1.0.4.
+        Save-Url "$downloads/latest" (Join-Path $tmp 'latest')
+        $version = "$(Get-Content -Raw (Join-Path $tmp 'latest'))".Trim()
+        if ($version -notmatch '^v?[0-9][0-9A-Za-z.+-]*$') {
+          throw "add-sg-mcp: could not read the latest version from $downloads/latest"
+        }
+      }
+      $base = "$downloads/v$($version.TrimStart('v'))"
+    }
     Write-Host "add-sg-mcp: downloading $archive"
     Save-Url "$base/$archive" (Join-Path $tmp $archive)
     Save-Url "$base/SHA256SUMS" (Join-Path $tmp 'SHA256SUMS')

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.4
+
+- The install scripts download from `dl.stackguardian.io`: `curl -fsSL https://dl.stackguardian.io/add-sg-mcp/install.sh | sh`, and `irm https://dl.stackguardian.io/add-sg-mcp/install.ps1 | iex` on Windows. On some networks the download from GitHub ran at under 100 KB/s, so the installer sat at "downloading" for several minutes. The GitHub release commands keep working and now fetch the executable from the same place.
+- `install.sh` shows a progress bar while it downloads in a terminal.
+- `ADD_SG_MCP_VERSION` finds releases from 1.0.4 on. For an older one, set `ADD_SG_MCP_DOWNLOAD_URL` to that GitHub release's download URL.
+
 ## [2.4.1] - 2026-09-29
 
 - fix GitHub Copilot CLI global installs and detection to use `$COPILOT_HOME` (default `~/.copilot`), the directory Copilot CLI reads. With `XDG_CONFIG_HOME` set, add-mcp wrote `$XDG_CONFIG_HOME/mcp-config.json`, which Copilot CLI never loads, and detected Copilot CLI whenever that directory existed. An existing `$XDG_CONFIG_HOME/mcp-config.json` is left untouched; rerun the install to write the Copilot CLI path. Global `list` and `remove` now read the corrected path, so entries that exist only in the old file no longer show up there.
