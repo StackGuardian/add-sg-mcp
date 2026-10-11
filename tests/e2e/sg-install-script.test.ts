@@ -237,6 +237,42 @@ if (!windows) {
       }
     }
   });
+
+  await test("piped into sh in a terminal, an arrow key moves the selection and is not echoed", async () => {
+    const child = runInstallerInTerminal(release, join(createTempDir(), "bin"));
+    let output = "";
+    child.stdout.on("data", (chunk: Buffer) => (output += chunk.toString()));
+    const screen = () => stripVTControlCharacters(output);
+    try {
+      assert.ok(
+        await waitFor(() => screen().includes("Where is your"), 30_000),
+        `no region prompt:\n${screen()}`,
+      );
+      const shown = output.length;
+      child.stdin.write("\x1b[B");
+      assert.ok(
+        await waitFor(
+          () =>
+            /[●>] United States/.test(
+              stripVTControlCharacters(output.slice(shown)),
+            ),
+          10_000,
+        ),
+        `Down did not select the second region:\n${screen()}`,
+      );
+      // An echoed Down moves the cursor, so each redraw lands a line lower.
+      assert.ok(
+        !output.slice(shown).includes("\x1b[B"),
+        `the key was written back to the terminal: ${JSON.stringify(output.slice(shown))}`,
+      );
+    } finally {
+      try {
+        if (child.pid) process.kill(-child.pid, "SIGKILL");
+      } catch {
+        // ESRCH: everything already exited.
+      }
+    }
+  });
 }
 
 if (!windows && spawnSync("curl", ["--version"]).status === 0) {

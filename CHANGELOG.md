@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.5
+
+- Fix the arrow keys in the standalone executable's prompts. Each Up or Down press was written back to the terminal, so the list was redrawn a line lower or higher every time: the region and agent lists repeated down the screen, or overwrote the lines above them. The npm package (`npx add-sg-mcp`) was not affected.
+
 ## 1.0.4
 
 - The install scripts download from `dl.stackguardian.io`: `curl -fsSL https://dl.stackguardian.io/add-sg-mcp/install.sh | sh`, and `irm https://dl.stackguardian.io/add-sg-mcp/install.ps1 | iex` on Windows. On some networks the download from GitHub ran at under 100 KB/s, so the installer sat at "downloading" for several minutes. The GitHub release commands keep working and now fetch the executable from the same place.
