@@ -603,6 +603,20 @@ test("--help is branded and lists the StackGuardian commands", () => {
   assert.match(output, /--token/);
 });
 
+test("--qa is accepted on connect and login but stays out of --help", () => {
+  const home = createTempDir();
+  const project = createTempDir();
+  expectOk(runCli(["login", "--qa", ...TOKEN_ARGS], project, home));
+  expectOk(
+    runCli(["--qa", ...TOKEN_ARGS, "-y", "-a", "claude-code"], project, home),
+  );
+  assert.doesNotMatch(expectOk(runCli(["--help"], project, home)), /--qa/);
+  assert.doesNotMatch(
+    expectOk(runCli(["login", "--help"], project, home)),
+    /--qa/,
+  );
+});
+
 test("--auth oauth writes a headerless entry for OAuth-capable agents only", () => {
   const home = createTempDir();
   const project = createTempDir();

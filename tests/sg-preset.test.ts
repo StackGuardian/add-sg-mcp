@@ -8,6 +8,7 @@ import {
   SG_ENVIRONMENTS,
   PRESET_EXCLUDED_AGENTS,
   environmentForRegion,
+  regionChoices,
   isValidOrg,
   isValidState,
   isValidApiKey,
@@ -73,6 +74,17 @@ test("environments cover eu, us and qa with matching hosts", () => {
     "https://testapi.qa.stackguardian.io/api/v1",
   );
   assert.strictEqual(environmentForRegion("apac"), undefined);
+});
+
+test("the region picker offers eu and us, and qa only when asked", () => {
+  assert.deepStrictEqual(
+    regionChoices().map((e) => e.id),
+    ["eu", "us"],
+  );
+  assert.deepStrictEqual(
+    regionChoices(true).map((e) => e.id),
+    ["eu", "us", "qa"],
+  );
 });
 
 test("buildMcpUrl uses /api/v1/orgs/<org>/mcp/ with a trailing slash", () => {
