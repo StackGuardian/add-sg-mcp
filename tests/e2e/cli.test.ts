@@ -1251,7 +1251,6 @@ test("sync: unreadable Copilot config is not treated as empty", () => {
   );
 });
 
-        neon: { url: "https://mcp.neon.tech/mcp" },
 test("E2E CLI: Copilot CLI global install writes ~/.copilot even when XDG_CONFIG_HOME is set", () => {
   const projectDir = createTempDir();
   const homeDir = createTempDir();
