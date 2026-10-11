@@ -26,12 +26,12 @@ Without Node.js, the installer downloads a standalone executable, checks it agai
 
 ```bash
 # macOS and Linux
-curl -fsSL https://github.com/StackGuardian/add-sg-mcp/releases/latest/download/install.sh | sh
+curl -fsSL https://dl.stackguardian.io/add-sg-mcp/install.sh | sh
 ```
 
 ```powershell
 # Windows (PowerShell)
-irm https://github.com/StackGuardian/add-sg-mcp/releases/latest/download/install.ps1 | iex
+irm https://dl.stackguardian.io/add-sg-mcp/install.ps1 | iex
 ```
 
 Then:
@@ -185,23 +185,25 @@ npx add-sg-mcp [options]
 Pass options to the first run:
 
 ```bash
-curl -fsSL https://github.com/StackGuardian/add-sg-mcp/releases/latest/download/install.sh | sh -s -- --region eu -a claude-code
+curl -fsSL https://dl.stackguardian.io/add-sg-mcp/install.sh | sh -s -- --region eu -a claude-code
 ```
 
 ```powershell
-& ([scriptblock]::Create((irm https://github.com/StackGuardian/add-sg-mcp/releases/latest/download/install.ps1))) --region eu -a claude-code
+& ([scriptblock]::Create((irm https://dl.stackguardian.io/add-sg-mcp/install.ps1))) --region eu -a claude-code
 ```
 
 Environment variables (with `curl | sh`, set them on the `sh` side: `… | ADD_SG_MCP_NO_RUN=1 sh`):
 
 | Variable                  | Effect                                                                                                                    |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `ADD_SG_MCP_VERSION`      | Release to install, e.g. `v0.2.0` (default: latest)                                                                       |
+| `ADD_SG_MCP_VERSION`      | Release to install, e.g. `v1.0.4` (default: latest)                                                                       |
 | `ADD_SG_MCP_INSTALL_DIR`  | Install directory. Default `~/.local/bin`; on Windows `%LOCALAPPDATA%\add-sg-mcp\bin`, which is added to your user `PATH` |
 | `ADD_SG_MCP_DOWNLOAD_URL` | Base URL of a mirror that serves the release files                                                                        |
 | `ADD_SG_MCP_NO_RUN`       | `1` installs without running `add-sg-mcp`                                                                                 |
 
 Builds exist for macOS (Apple Silicon, Intel), Linux with glibc (x64, arm64) and Windows x64. To install by hand, download `add-sg-mcp-<os>-<arch>.tar.gz` (or `add-sg-mcp-windows-x64.zip`) from the release and put the executable on your `PATH`. `gh attestation verify <file> --repo StackGuardian/add-sg-mcp` confirms that a file was built by this repository's workflow.
+
+The installer downloads from `dl.stackguardian.io`, which has every release from 1.0.4 on. The same files are attached to each [GitHub release](https://github.com/StackGuardian/add-sg-mcp/releases); to install from there, or to install an older release, set `ADD_SG_MCP_DOWNLOAD_URL=https://github.com/StackGuardian/add-sg-mcp/releases/download/v1.0.3`.
 
 The executables are not yet notarized by Apple or code-signed for Windows. The install scripts are not affected, but a browser download is quarantined on macOS and may show a SmartScreen prompt on Windows (_More info → Run anyway_).
 

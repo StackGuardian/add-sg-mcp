@@ -1,19 +1,20 @@
 #!/usr/bin/env tsx
 // Runs install.sh (install.ps1 on Windows) against release files served over
-// file://, the way `curl … | sh` runs it against a GitHub release.
+// file://, the way `curl … | sh` runs it against dl.stackguardian.io.
 import assert from "node:assert";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   cpSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { stripVTControlCharacters } from "node:util";
 
@@ -41,6 +42,8 @@ function createTempDir(): string {
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const windows = process.platform === "win32";
+const installScript = join(repoRoot, windows ? "install.ps1" : "install.sh");
+const downloads = "https://dl.stackguardian.io/add-sg-mcp";
 const target = `${windows ? "windows" : process.platform}-${process.arch}`;
 const archive = `add-sg-mcp-${target}.${windows ? "zip" : "tar.gz"}`;
 const exe = windows ? "add-sg-mcp.exe" : "add-sg-mcp";
@@ -55,7 +58,7 @@ function mustRun(command: string, args: string[]) {
   }
 }
 
-/** A directory laid out like a GitHub release: the archive plus SHA256SUMS. */
+/** A directory laid out like one release: the archive plus SHA256SUMS. */
 function buildRelease(): string {
   const release = createTempDir();
   const stage = createTempDir();
@@ -80,6 +83,30 @@ const release = process.env.ADD_SG_MCP_RELEASE_DIR
   ? resolve(process.env.ADD_SG_MCP_RELEASE_DIR)
   : buildRelease();
 
+/**
+ * A directory laid out like dl.stackguardian.io/add-sg-mcp: the release under
+ * `v<version>/` and a `latest` file with the given content.
+ */
+function buildDownloads(latest: string): string {
+  const root = createTempDir();
+  const versionDir = join(root, `v${version}`);
+  mkdirSync(versionDir);
+  for (const file of [archive, "SHA256SUMS"]) {
+    cpSync(join(release, file), join(versionDir, file));
+  }
+  writeFileSync(join(root, "latest"), latest);
+  return root;
+}
+
+/** A copy of the install script that downloads from `root`, not dl.stackguardian.io. */
+function installScriptFor(root: string): string {
+  const source = readFileSync(installScript, "utf-8");
+  assert.ok(source.includes(downloads), `${installScript} uses ${downloads}`);
+  const copy = join(createTempDir(), basename(installScript));
+  writeFileSync(copy, source.replaceAll(downloads, pathToFileURL(root).href));
+  return copy;
+}
+
 function installerEnv(from: string, installDir: string) {
   return {
     ...process.env,
@@ -94,7 +121,11 @@ function runInstaller(
   from: string,
   installDir: string,
   args: string[],
-  options: { env?: Record<string, string>; piped?: boolean } = {},
+  options: {
+    env?: Record<string, string>;
+    piped?: boolean;
+    script?: string;
+  } = {},
 ) {
   const spawnOptions = {
     cwd: createTempDir(),
@@ -109,13 +140,13 @@ function runInstaller(
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        join(repoRoot, "install.ps1"),
+        options.script ?? installScript,
         ...args,
       ],
       spawnOptions,
     );
   }
-  const script = join(repoRoot, "install.sh");
+  const script = options.script ?? installScript;
   return options.piped
     ? spawnSync("sh", ["-s", "--", ...args], {
         ...spawnOptions,
@@ -128,9 +159,13 @@ function runInstaller(
  * Runs `sh -s < install.sh` in a pseudo-terminal from script(1), the way
  * `curl … | sh` runs in a terminal: stdin is the script, the terminal is not.
  */
-function runInstallerInTerminal(from: string, installDir: string) {
+function runInstallerInTerminal(
+  from: string,
+  installDir: string,
+  env: Record<string, string> = {},
+) {
   // A new pty is 0 columns wide, which wraps every prompt character.
-  const command = `stty cols 100 rows 30; sh -s < '${join(repoRoot, "install.sh")}'`;
+  const command = `stty cols 100 rows 30; sh -s < '${installScript}'`;
   // macOS script(1) rejects a socket as stdin, so `cat` hands it a pipe.
   const script =
     process.platform === "darwin"
@@ -141,7 +176,7 @@ function runInstallerInTerminal(from: string, installDir: string) {
   // test is about the prompts.
   return spawn("sh", ["-c", script, "sh", command], {
     cwd: createTempDir(),
-    env: { ...installerEnv(from, installDir), CI: "" },
+    env: { ...installerEnv(from, installDir), CI: "", ...env },
     detached: true,
   });
 }
@@ -203,6 +238,80 @@ if (!windows) {
     }
   });
 }
+
+if (!windows && spawnSync("curl", ["--version"]).status === 0) {
+  await test("the download shows progress in a terminal and stays quiet when piped", async () => {
+    const child = runInstallerInTerminal(
+      release,
+      join(createTempDir(), "bin"),
+      {
+        ADD_SG_MCP_NO_RUN: "1",
+      },
+    );
+    let output = "";
+    child.stdout.on("data", (chunk: Buffer) => (output += chunk.toString()));
+    const screen = () => stripVTControlCharacters(output);
+    try {
+      assert.ok(
+        await waitFor(() => screen().includes("installed"), 30_000),
+        `the install did not finish:\n${screen()}`,
+      );
+      assert.match(screen(), /100\.0%/, "curl draws its progress bar");
+    } finally {
+      try {
+        if (child.pid) process.kill(-child.pid, "SIGKILL");
+      } catch {
+        // ESRCH: everything already exited.
+      }
+    }
+
+    const piped = runInstaller(release, join(createTempDir(), "bin"), [], {
+      env: { ADD_SG_MCP_NO_RUN: "1" },
+    });
+    assert.strictEqual(piped.status, 0, describe(piped));
+    assert.doesNotMatch(String(piped.stderr), /%/);
+  });
+}
+
+await test("with no version set, it installs the release that `latest` names", () => {
+  const root = buildDownloads(`v${version}\n`);
+  const installDir = join(createTempDir(), "bin");
+  const result = runInstaller(root, installDir, ["--version"], {
+    script: installScriptFor(root),
+    env: { ADD_SG_MCP_DOWNLOAD_URL: "" },
+  });
+  assert.strictEqual(result.status, 0, describe(result));
+  assert.match(String(result.stdout), new RegExp(`^${version}$`, "m"));
+});
+
+await test("ADD_SG_MCP_VERSION installs that release without reading `latest`", () => {
+  const root = buildDownloads("v0.0.0\n");
+  for (const pinned of [version, `v${version}`]) {
+    const result = runInstaller(
+      root,
+      join(createTempDir(), "bin"),
+      ["--version"],
+      {
+        script: installScriptFor(root),
+        env: { ADD_SG_MCP_DOWNLOAD_URL: "", ADD_SG_MCP_VERSION: pinned },
+      },
+    );
+    assert.strictEqual(result.status, 0, describe(result));
+    assert.match(String(result.stdout), new RegExp(`^${version}$`, "m"));
+  }
+});
+
+await test("a `latest` that does not name a version aborts before anything is installed", () => {
+  const root = buildDownloads("<html>Not found</html>\n");
+  const installDir = join(createTempDir(), "bin");
+  const result = runInstaller(root, installDir, ["--version"], {
+    script: installScriptFor(root),
+    env: { ADD_SG_MCP_DOWNLOAD_URL: "" },
+  });
+  assert.notStrictEqual(result.status, 0, describe(result));
+  assert.match(`${result.stdout}${result.stderr}`, /latest version/);
+  assert.ok(!existsSync(join(installDir, exe)), "nothing is installed");
+});
 
 await test("ADD_SG_MCP_NO_RUN=1 installs without running add-sg-mcp", () => {
   const installDir = join(createTempDir(), "bin");

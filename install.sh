@@ -1,16 +1,16 @@
 #!/bin/sh
 # Installs the add-sg-mcp standalone executable (no Node.js needed) and runs it.
 #
-#   curl -fsSL https://github.com/StackGuardian/add-sg-mcp/releases/latest/download/install.sh | sh
-#   curl -fsSL https://github.com/StackGuardian/add-sg-mcp/releases/latest/download/install.sh | sh -s -- --region eu -a claude-code
+#   curl -fsSL https://dl.stackguardian.io/add-sg-mcp/install.sh | sh
+#   curl -fsSL https://dl.stackguardian.io/add-sg-mcp/install.sh | sh -s -- --region eu -a claude-code
 #
-# ADD_SG_MCP_VERSION       release to install, e.g. v0.2.0 (default: latest)
+# ADD_SG_MCP_VERSION       release to install, e.g. v1.0.4 (default: latest)
 # ADD_SG_MCP_INSTALL_DIR   install directory (default: ~/.local/bin)
 # ADD_SG_MCP_DOWNLOAD_URL  base URL serving the release files, e.g. an internal mirror
 # ADD_SG_MCP_NO_RUN=1      install only; do not run add-sg-mcp afterwards
 set -eu
 
-RELEASES=https://github.com/StackGuardian/add-sg-mcp/releases
+DOWNLOADS=https://dl.stackguardian.io/add-sg-mcp
 
 say() { printf 'add-sg-mcp: %s\n' "$*" >&2; }
 fail() {
@@ -42,9 +42,14 @@ detect_target() {
   TARGET="$os-$arch"
 }
 
+# download URL FILE [progress]: with "progress", curl draws a bar in a terminal.
 download() {
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL --retry 3 -o "$2" "$1"
+    if [ "${3:-}" = progress ] && [ -t 2 ]; then
+      curl -fL --retry 3 --progress-bar -o "$2" "$1"
+    else
+      curl -fsSL --retry 3 -o "$2" "$1"
+    fi
   elif command -v wget >/dev/null 2>&1; then
     wget -q -O "$2" "$1"
   else
@@ -63,21 +68,28 @@ sha256() {
 main() {
   detect_target
   archive="add-sg-mcp-$TARGET.tar.gz"
-  if [ -n "${ADD_SG_MCP_DOWNLOAD_URL:-}" ]; then
-    base=${ADD_SG_MCP_DOWNLOAD_URL%/}
-  elif [ -n "${ADD_SG_MCP_VERSION:-}" ]; then
-    base="$RELEASES/download/v${ADD_SG_MCP_VERSION#v}"
-  else
-    base="$RELEASES/latest/download"
-  fi
   dir=${ADD_SG_MCP_INSTALL_DIR:-$HOME/.local/bin}
   command -v sha256sum >/dev/null 2>&1 || command -v shasum >/dev/null 2>&1 ||
     fail "sha256sum or shasum is required to verify the download"
 
   tmp=$(mktemp -d)
   trap 'rm -rf "$tmp"' EXIT
+  if [ -n "${ADD_SG_MCP_DOWNLOAD_URL:-}" ]; then
+    base=${ADD_SG_MCP_DOWNLOAD_URL%/}
+  else
+    version=${ADD_SG_MCP_VERSION:-}
+    if [ -z "$version" ]; then
+      # A one-line file naming the newest release, e.g. v1.0.4.
+      download "$DOWNLOADS/latest" "$tmp/latest"
+      version=$(tr -d '[:space:]' <"$tmp/latest")
+      case "${version#v}" in
+        "" | [!0-9]* | *[!0-9A-Za-z.+-]*) fail "could not read the latest version from $DOWNLOADS/latest" ;;
+      esac
+    fi
+    base="$DOWNLOADS/v${version#v}"
+  fi
   say "downloading $archive"
-  download "$base/$archive" "$tmp/$archive"
+  download "$base/$archive" "$tmp/$archive" progress
   download "$base/SHA256SUMS" "$tmp/SHA256SUMS"
   expected=$(awk -v f="$archive" '$2 == f { print $1 }' "$tmp/SHA256SUMS")
   [ -n "$expected" ] || fail "$archive is not listed in SHA256SUMS"
