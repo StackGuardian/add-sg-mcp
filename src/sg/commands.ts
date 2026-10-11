@@ -1,5 +1,6 @@
 import * as p from "@clack/prompts";
 import chalk from "chalk";
+import { Option } from "commander";
 import type { Command } from "commander";
 import type { AgentType } from "../types.js";
 import {
@@ -23,6 +24,7 @@ import {
   buildAuthHeader,
   buildMcpUrl,
   environmentForRegion,
+  regionChoices,
   isAllowedApiBase,
   isValidApiKey,
   isValidOrg,
@@ -56,6 +58,8 @@ export interface SgAuthOptions {
   /** Commander sets this to false for --no-browser. */
   browser?: boolean;
   loginTimeout?: string;
+  /** Hidden --qa: the region picker also offers QA. */
+  qa?: boolean;
 }
 
 export interface SgInstallOptions {
@@ -120,10 +124,10 @@ function grantValidity(credentials: SgCredentials): string {
   return `${isExpired(credentials) ? "expired" : "expires"} ${new Date(at).toLocaleString()}`;
 }
 
-async function chooseRegion(): Promise<string> {
+async function chooseRegion(showQa?: boolean): Promise<string> {
   const choice = await p.select({
     message: "Where is your StackGuardian account?",
-    options: SG_ENVIRONMENTS.filter((env) => env.id !== "qa").map((env) => ({
+    options: regionChoices(showQa).map((env) => ({
       value: env.id,
       label: env.label,
     })),
@@ -158,7 +162,7 @@ async function resolveDashboard(
     options.region ??
     envVar("SG_REGION") ??
     (isInteractive()
-      ? await chooseRegion()
+      ? await chooseRegion(options.qa)
       : fail(
           "Pass --region eu|us (or --dashboard-url) when running without a terminal.",
         ));
@@ -583,7 +587,9 @@ export async function runConnect(
     const region =
       options.region ??
       envVar("SG_REGION") ??
-      (isInteractive() ? await chooseRegion() : fail("Pass --region eu|us."));
+      (isInteractive()
+        ? await chooseRegion(options.qa)
+        : fail("Pass --region eu|us."));
     const env = environmentForRegion(region);
     if (!env) fail(`Unknown region "${region}".`);
     if (options.apiBase && !isAllowedApiBase(options.apiBase)) {
@@ -848,6 +854,7 @@ function addAuthOptions(command: Command): Command {
       "--region <eu|us|qa>",
       "StackGuardian region (prompted when omitted)",
     )
+    .addOption(new Option("--qa", "Offer QA in the region prompt").hideHelp())
     .option(
       "--dashboard-url <url>",
       "Dashboard URL for another environment (e.g. http://localhost:3000)",

@@ -67,6 +67,11 @@ export const SG_ENVIRONMENTS: readonly SgEnvironment[] = [
   },
 ];
 
+/** Environments the region picker offers; QA only on request. */
+export function regionChoices(showQa = false): SgEnvironment[] {
+  return SG_ENVIRONMENTS.filter((env) => showQa || env.id !== "qa");
+}
+
 export function environmentForRegion(
   region: string,
 ): SgEnvironment | undefined {
