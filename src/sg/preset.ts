@@ -34,10 +34,6 @@ export function isStackGuardianServer(name: string, url?: string): boolean {
     return false;
   }
 }
-/** `client` query parameter the dashboard shows on the connect page. */
-export const SG_CLIENT_ID = "add-sg-mcp";
-/** Dashboard route that mints the credential and redirects to the loopback callback. */
-export const CLI_CONNECT_PATH = "/orchestrator/cli-connect";
 
 export interface SgEnvironment {
   id: "eu" | "us" | "qa";
@@ -158,19 +154,3 @@ export const OAUTH_CAPABLE_AGENTS: readonly AgentType[] = [
   "gemini-cli",
   "windsurf",
 ];
-
-export function cliConnectUrl(
-  dashboardUrl: string,
-  port: number,
-  state: string,
-  org?: string,
-): string {
-  const base = `${dashboardUrl.trim().replace(/\/+$/, "")}/`;
-  const url = new URL(CLI_CONNECT_PATH, base);
-  url.searchParams.set("port", String(port));
-  url.searchParams.set("state", state);
-  url.searchParams.set("client", SG_CLIENT_ID);
-  url.searchParams.set("v", "1");
-  if (org) url.searchParams.set("org", org);
-  return url.toString();
-}

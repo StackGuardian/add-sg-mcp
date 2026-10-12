@@ -4,7 +4,7 @@ A CLI that connects coding agents (Claude Code, Codex, Cursor, VS Code, Gemini C
 
 ## Layout
 
-- `src/sg/` — everything StackGuardian-specific: `preset.ts` (URLs, header, validation), `credentials.ts` (credential store), `auth.ts` (loopback browser login), `skills.ts` (skills installer), `commands.ts` (Commander wiring for the default connect flow, `login`, `logout`, `status`, `remove`), `types.ts`.
+- `src/sg/` — everything StackGuardian-specific: `preset.ts` (URLs, header, validation), `credentials.ts` (credential store), `auth.ts` (pieces the browser sign-in shares: state, callback page, URL opener), `oauth.ts` (grant sign-in through the OAuth broker), `skills.ts` (skills installer), `commands.ts` (Commander wiring for the default connect flow, `login`, `logout`, `status`, `remove`), `types.ts`.
 - `src/agents.ts`, `src/installer.ts`, `src/formats/*`, `src/schema.ts`, `src/reader.ts`, `src/opencode-config.ts`, `src/source-parser.ts`, `src/template.ts` — upstream, kept byte-identical so `git merge upstream/main` stays cheap. Do not put StackGuardian logic there.
 - `src/index.ts` — the bin. Upstream's `main()` install flow plus the registration of the `sg` commands (`registerSgCommands`, dependencies injected to avoid an import cycle).
 - `skills/` — the bundled `SKILL.md` folders shipped in the npm package.

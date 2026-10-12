@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0
+
+- `npx add-sg-mcp` now signs in for a **grant token** by default: the browser opens the consent page, where you choose the organization, the roles the agent may use and the expiry. This is the only sign-in that opens the dashboard.
+- An API key is no longer fetched through the browser. Pass it with `--token <api-key> --org <org> --region <eu|us>` (or `SG_API_KEY`, `SG_ORG`, `SG_REGION`). `--auth apikey` without a key now fails and says so, where it used to open a dashboard page that does not exist.
+- Without `--auth`, a key you pass, or one saved by an earlier `--token` run, still selects the API key, so existing `--token` and CI setups are unchanged. `add-sg-mcp login` without a key always signs in for a grant.
+
 ## 1.0.5
 
 - Fix the arrow keys in the standalone executable's prompts. Each Up or Down press was written back to the terminal, so the list was redrawn a line lower or higher every time: the region and agent lists repeated down the screen, or overwrote the lines above them. The npm package (`npx add-sg-mcp`) was not affected.

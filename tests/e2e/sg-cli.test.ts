@@ -310,18 +310,94 @@ test("saved credentials are reused, and --project writes into the cwd with a .gi
   );
 });
 
-test("--org overriding saved credentials triggers a fresh sign-in requirement", () => {
+test("--org overriding a saved key asks for that organization's key and opens nothing", () => {
   const home = createTempDir();
   const project = createTempDir();
   expectOk(runCli(["login", ...TOKEN_ARGS], project, home));
   const result = runCli(
-    ["--org", "other-org", "-y", "-a", "claude-code"],
+    ["--org", "other-org", "--region", "eu", "-y", "-a", "claude-code"],
     project,
     home,
   );
   assert.notStrictEqual(result.status, 0);
   const output = `${result.stdout}\n${result.stderr}`;
-  assert.match(output, /--region|terminal|browser/);
+  assert.match(output, /--token/);
+  assert.ok(!output.includes("https://"), "no sign-in page for an API key");
+  assert.strictEqual(existsSync(join(home, ".claude.json")), false);
+});
+
+// A key is only ever passed in: nothing in API-key mode opens the dashboard.
+test("--auth apikey without a key fails on connect and login, and opens nothing", () => {
+  const project = createTempDir();
+  for (const command of [[], ["login"]]) {
+    const home = createTempDir();
+    const result = runCli(
+      [
+        ...command,
+        "--auth",
+        "apikey",
+        "--region",
+        "eu",
+        "--no-browser",
+        "--login-timeout",
+        "1",
+        ...(command.length === 0 ? ["-y", "-a", "claude-code"] : []),
+      ],
+      project,
+      home,
+    );
+    const output = `${result.stdout}\n${result.stderr}`;
+    assert.notStrictEqual(result.status, 0);
+    assert.match(output, /--token/);
+    assert.match(output, /--auth grant/);
+    assert.ok(!output.includes("https://"), "no sign-in page for an API key");
+    assert.strictEqual(
+      existsSync(join(home, ".config", "add-sg-mcp", "credentials.json")),
+      false,
+    );
+  }
+});
+
+test("without --auth and without a key, connect signs in through the broker", () => {
+  const home = createTempDir();
+  const project = createTempDir();
+  const result = runCli(
+    [
+      "--region",
+      "eu",
+      "--no-browser",
+      "--login-timeout",
+      "1",
+      "-y",
+      "-a",
+      "claude-code",
+    ],
+    project,
+    home,
+  );
+  const output = `${result.stdout}\n${result.stderr}`;
+  assert.match(output, /\/oauth\/authorize\/\?/);
+  assert.match(output, /code_challenge=/);
+  assert.ok(!output.includes("cli-connect"));
+  assert.notStrictEqual(result.status, 0);
+  assert.strictEqual(existsSync(join(home, ".claude.json")), false);
+});
+
+test("login without a key signs in through the broker, whatever key is saved", () => {
+  const project = createTempDir();
+  for (const withSavedKey of [false, true]) {
+    const home = createTempDir();
+    if (withSavedKey) expectOk(runCli(["login", ...TOKEN_ARGS], project, home));
+    const result = runCli(
+      ["login", "--region", "eu", "--no-browser", "--login-timeout", "1"],
+      project,
+      home,
+    );
+    const output = `${result.stdout}\n${result.stderr}`;
+    assert.match(output, /\/oauth\/authorize\/\?/, String(withSavedKey));
+    assert.ok(!output.includes("cli-connect"));
+    assert.notStrictEqual(result.status, 0);
+  }
 });
 
 test("preset-excluded agents and bad inputs fail clearly", () => {
@@ -418,19 +494,15 @@ test("a saved grant is shown by status but never reused as an API key", () => {
   assert.match(status, /Grant token: sgat…1234/);
   assert.match(status, /Validity: expires/);
 
-  // Default (apikey) mode must ignore the grant and ask for a sign-in instead.
-  const connect = runCli(["-y", "--all"], project, home);
+  // API-key mode must ignore the grant and ask for a key instead.
+  const connect = runCli(["--auth", "apikey", "-y", "--all"], project, home);
   assert.notStrictEqual(connect.status, 0);
   const output = `${connect.stdout}\n${connect.stderr}`;
   assert.ok(
     !output.includes("Using saved credentials"),
     "a grant must not be reused as an API key",
   );
-  assert.match(output, /--region/);
-  assert.match(
-    output,
-    /The saved grant for demo-org will be replaced; it stays active until you revoke it from Profile → Connected apps\./,
-  );
+  assert.match(output, /--token/);
   assert.ok(!output.includes("sgat_"), "the grant token must never be printed");
   assert.strictEqual(existsSync(join(home, ".claude.json")), false);
 });
