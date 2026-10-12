@@ -1,14 +1,5 @@
-import http from "node:http";
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
-import type { AddressInfo } from "node:net";
-import {
-  cliConnectUrl,
-  isAllowedApiBase,
-  isValidApiKey,
-  isValidOrg,
-  normalizeApiBase,
-} from "./preset.js";
 
 export type LoginErrorCode = "cancelled" | "timeout";
 
@@ -21,38 +12,6 @@ export class LoginError extends Error {
     this.name = "LoginError";
   }
 }
-
-export interface CallbackResult {
-  org: string;
-  apiKey: string;
-  apiBase: string;
-}
-
-export interface CallbackServer {
-  port: number;
-  /** Settles once: with the credential, or a LoginError("cancelled"). */
-  result: Promise<CallbackResult>;
-  close(): void;
-}
-
-export interface CallbackServerOptions {
-  /** Extra API hostnames accepted besides `*.stackguardian.io` (custom environments). */
-  allowedApiHosts?: string[];
-  /** Where the landing pages link back to, so Cancel never strands the user on a loopback page. */
-  dashboardUrl?: string;
-}
-
-export interface LoginOptions extends CallbackServerOptions {
-  dashboardUrl: string;
-  org?: string;
-  timeoutMs?: number;
-  /** Returns false when no browser could be opened; the URL was already passed to onAuthUrl. */
-  openBrowser?: (url: string) => Promise<boolean>;
-  onAuthUrl?: (url: string) => void;
-}
-
-const DEFAULT_TIMEOUT_MS = 300_000;
-const MAX_FORM_BYTES = 64 * 1024;
 
 export function generateState(): string {
   return randomBytes(32).toString("base64url");
@@ -76,22 +35,15 @@ const LOGO_MARK =
 /**
  * The page the browser lands on. Styled with the StackGuardian design-system
  * tokens (Inter, #1b71ec primary, 10px radius) so it reads like the dashboard;
- * it is self-contained (no network), never includes the key, strips the query
- * from history, and links back to the dashboard when one is known.
+ * it is self-contained (no network), never includes the key and strips the
+ * query from history.
  */
-export function callbackHtml(
-  kind: "ok" | "error",
-  message: string,
-  backUrl?: string,
-): string {
+export function callbackHtml(kind: "ok" | "error", message: string): string {
   const title = kind === "ok" ? "Connected to StackGuardian" : "Not connected";
   const badge =
     kind === "ok"
       ? `<span class="status ok"><span class="dot"></span>Connected</span>`
       : `<span class="status err"><span class="dot"></span>Not connected</span>`;
-  const back = backUrl
-    ? `<a class="back" href="${escapeHtml(backUrl)}">Back to StackGuardian</a>`
-    : "";
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title>
 <style>
@@ -110,187 +62,16 @@ p{margin:0;color:var(--muted-foreground)}
 .status.ok .dot{background:var(--success-accent)}
 .status.err{background:var(--warning);color:var(--warning-foreground);border-color:var(--warning-border)}
 .status.err .dot{background:var(--warning-accent)}
-.back{display:inline-block;margin-top:1.25rem;margin-left:.75rem;font-size:.875rem;color:var(--primary);text-decoration:none}
-.back:hover{text-decoration:underline}
 </style></head>
 <body><main>
 <div class="brand">${LOGO_MARK}<span>StackGuardian</span></div>
 <h1>${escapeHtml(title)}</h1>
 <p>${escapeHtml(message)}</p>
-${badge}${back}
+${badge}
 </main>
 <script>try{history.replaceState(null,"","/done")}catch(e){}</script>
 </body></html>
 `;
-}
-
-function respond(
-  res: http.ServerResponse,
-  status: number,
-  kind: "ok" | "error",
-  message: string,
-  backUrl?: string,
-  onFlushed?: () => void,
-): void {
-  res.writeHead(status, {
-    "content-type": "text/html; charset=utf-8",
-    "cache-control": "no-store",
-  });
-  res.end(callbackHtml(kind, message, backUrl), onFlushed);
-}
-
-/**
- * The callback arrives as a form POST (preferred: the key stays out of the
- * browser history and of any request log) or as a GET (manual use).
- */
-function readParams(
-  req: http.IncomingMessage,
-): Promise<URLSearchParams | null> {
-  const url = new URL(req.url ?? "/", "http://127.0.0.1");
-  if (req.method === "GET") return Promise.resolve(url.searchParams);
-  if (req.method !== "POST") return Promise.resolve(null);
-  return new Promise((resolve) => {
-    let body = "";
-    let settled = false;
-    const done = (value: URLSearchParams | null) => {
-      if (settled) return;
-      settled = true;
-      resolve(value);
-    };
-    req.on("data", (chunk: Buffer) => {
-      body += chunk.toString("utf8");
-      if (body.length > MAX_FORM_BYTES) {
-        req.destroy();
-        done(null);
-      }
-    });
-    req.on("end", () => done(new URLSearchParams(body)));
-    req.on("error", () => done(null));
-  });
-}
-
-export function startCallbackServer(
-  state: string,
-  options: CallbackServerOptions = {},
-): Promise<CallbackServer> {
-  return new Promise((resolveServer, rejectServer) => {
-    let settle: {
-      resolve: (value: CallbackResult) => void;
-      reject: (error: Error) => void;
-    } | null = null;
-    const result = new Promise<CallbackResult>((resolve, reject) => {
-      settle = { resolve, reject };
-    });
-    // Nobody may be awaiting yet when a cancel arrives; keep Node quiet.
-    result.catch(() => {});
-    const back = options.dashboardUrl;
-
-    const server = http.createServer((req, res) => {
-      const url = new URL(req.url ?? "/", "http://127.0.0.1");
-      if (
-        url.pathname !== "/callback" ||
-        (req.method !== "GET" && req.method !== "POST")
-      ) {
-        respond(res, 404, "error", "Not found.", back);
-        return;
-      }
-      void readParams(req).then((params) => {
-        if (!params) {
-          respond(res, 400, "error", "Could not read the callback.", back);
-          return;
-        }
-        if (params.get("state") !== state) {
-          respond(
-            res,
-            400,
-            "error",
-            "This link does not match the terminal session. Start again from the terminal.",
-            back,
-          );
-          return;
-        }
-        const error = params.get("error");
-        if (error) {
-          respond(
-            res,
-            200,
-            "error",
-            "Cancelled. You can close this tab.",
-            back,
-            () => {
-              settle?.reject(
-                new LoginError(
-                  "cancelled",
-                  `Cancelled in the browser (${error})`,
-                ),
-              );
-              close();
-            },
-          );
-          return;
-        }
-        const org = params.get("org");
-        const apiKey = params.get("api_key");
-        const apiBase = params.get("api_base");
-        if (!isValidOrg(org)) {
-          respond(
-            res,
-            400,
-            "error",
-            "Invalid organization in the callback.",
-            back,
-          );
-          return;
-        }
-        if (!isValidApiKey(apiKey)) {
-          respond(
-            res,
-            400,
-            "error",
-            "Invalid credential in the callback.",
-            back,
-          );
-          return;
-        }
-        if (!apiBase || !isAllowedApiBase(apiBase, options.allowedApiHosts)) {
-          respond(
-            res,
-            400,
-            "error",
-            "The API host in the callback is not a StackGuardian host.",
-            back,
-          );
-          return;
-        }
-        respond(
-          res,
-          200,
-          "ok",
-          "You can close this tab and return to the terminal.",
-          back,
-          () => {
-            settle?.resolve({
-              org,
-              apiKey,
-              apiBase: normalizeApiBase(apiBase),
-            });
-            close();
-          },
-        );
-      });
-    });
-
-    function close(): void {
-      server.close();
-      server.closeIdleConnections?.();
-    }
-
-    server.on("error", rejectServer);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address() as AddressInfo;
-      resolveServer({ port: address.port, result, close });
-    });
-  });
 }
 
 /** Opens the URL with the platform opener; argv only, never a shell string. */
@@ -316,41 +97,4 @@ export function openUrl(url: string): Promise<boolean> {
       resolve(false);
     }
   });
-}
-
-export async function loginViaBrowser(
-  options: LoginOptions,
-): Promise<CallbackResult> {
-  const state = generateState();
-  const server = await startCallbackServer(state, {
-    allowedApiHosts: options.allowedApiHosts,
-    dashboardUrl: options.dashboardUrl,
-  });
-  const authUrl = cliConnectUrl(
-    options.dashboardUrl,
-    server.port,
-    state,
-    options.org,
-  );
-  options.onAuthUrl?.(authUrl);
-  const open = options.openBrowser ?? openUrl;
-  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  let timer: NodeJS.Timeout | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      server.close();
-      reject(
-        new LoginError(
-          "timeout",
-          `No response from the browser within ${Math.round(timeoutMs / 1000)}s.`,
-        ),
-      );
-    }, timeoutMs);
-  });
-  try {
-    await open(authUrl).catch(() => false);
-    return await Promise.race([server.result, timeout]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
 }

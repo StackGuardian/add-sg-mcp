@@ -1,8 +1,14 @@
 # Changelog
 
-## 1.0.6
+## 1.1.1
 
 - `add-sg-mcp login` carries on after you sign in: it asks which coding agents should get the server, then installs the server and the skills, the same as `add-sg-mcp`. Before, it stopped at "Run add-sg-mcp to install the server and skills" and you had to run a second command. Without a terminal (CI, a pipe) `login` still only saves the credential.
+
+## 1.1.0
+
+- `npx add-sg-mcp` now signs in for a **grant token** by default: the browser opens the consent page, where you choose the organization, the roles the agent may use and the expiry. This is the only sign-in that opens the dashboard.
+- An API key is no longer fetched through the browser. Pass it with `--token <api-key> --org <org> --region <eu|us>` (or `SG_API_KEY`, `SG_ORG`, `SG_REGION`). `--auth apikey` without a key now fails and says so, where it used to open a dashboard page that does not exist.
+- Without `--auth`, a key you pass, or one saved by an earlier `--token` run, still selects the API key, so existing `--token` and CI setups are unchanged. `add-sg-mcp login` without a key always signs in for a grant.
 
 ## 1.0.5
 

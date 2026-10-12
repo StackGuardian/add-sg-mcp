@@ -17,7 +17,6 @@ import {
   buildMcpUrl,
   buildAuthHeader,
   maskKey,
-  cliConnectUrl,
 } from "../src/sg/preset.js";
 
 let passed = 0;
@@ -162,25 +161,6 @@ test("buildAuthHeader picks the scheme from the credential", () => {
 test("maskKey keeps prefix and last four characters", () => {
   assert.strictEqual(maskKey("sgu_abcdefgh1234"), "sgu_…1234");
   assert.strictEqual(maskKey("short"), "…");
-});
-
-test("cliConnectUrl targets the orchestrator page with encoded params", () => {
-  const url = new URL(
-    cliConnectUrl("https://app.stackguardian.io/", 51234, "state_ABC-123"),
-  );
-  assert.strictEqual(
-    url.origin + url.pathname,
-    "https://app.stackguardian.io/orchestrator/cli-connect",
-  );
-  assert.strictEqual(url.searchParams.get("port"), "51234");
-  assert.strictEqual(url.searchParams.get("state"), "state_ABC-123");
-  assert.strictEqual(url.searchParams.get("client"), "add-sg-mcp");
-  assert.strictEqual(url.searchParams.get("v"), "1");
-  assert.strictEqual(url.searchParams.get("org"), null);
-  const withOrg = new URL(
-    cliConnectUrl("http://localhost:3000", 4000, "s".repeat(16), "demo org"),
-  );
-  assert.strictEqual(withOrg.searchParams.get("org"), "demo org");
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

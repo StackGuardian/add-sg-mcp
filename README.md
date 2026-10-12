@@ -36,7 +36,7 @@ irm https://dl.stackguardian.io/add-sg-mcp/install.ps1 | iex
 
 Then:
 
-1. Pick your region. The StackGuardian dashboard opens in your browser; sign in if needed and choose the organization.
+1. Pick your region. The StackGuardian dashboard opens in your browser; sign in if needed, then choose the organization, the roles the agent may use and how long the access lasts.
 2. Back in the terminal, choose the agents to connect. The ones found on this machine (or those you picked last time) are preselected.
 3. Restart those agents.
 
@@ -79,23 +79,25 @@ In Claude Code, start one with `/sg-create-workflow` and so on. Other agents pic
 
 ## Choose how your agent signs in
 
-|                     | API key (default)                              | Grant token                                                   | OAuth (preview)                                             |
-| ------------------- | ---------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------- |
-| Command             | `npx add-sg-mcp`                               | `npx add-sg-mcp --auth grant`                                 | `npx add-sg-mcp --auth oauth --org <org> --region <eu\|us>` |
-| What the agent gets | Your user API key for the organization         | A token for one organization and the roles you approve        | No stored credential; the agent signs you in on first use   |
-| Access              | Everything your roles allow                    | Only the roles you approved                                   | Your access, through the agent's own sign-in                |
-| Expiry and revoking | No expiry; rotate it from _Profile → API keys_ | You choose the expiry; revoke from _Profile → Connected apps_ | Handled through the agent's own sign-in                     |
+|                     | Grant token (default)                                         | API key                                                          | OAuth (preview)                                             |
+| ------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- |
+| Command             | `npx add-sg-mcp`                                              | `npx add-sg-mcp --token <api-key> --org <org> --region <eu\|us>` | `npx add-sg-mcp --auth oauth --org <org> --region <eu\|us>` |
+| How you sign in     | In the browser                                                | No browser: you pass a key from _Profile → API keys_             | In the agent, on first use                                  |
+| What the agent gets | A token for one organization and the roles you approve        | Your user API key for the organization                           | No stored credential; the agent signs you in on first use   |
+| Access              | Only the roles you approved                                   | Everything your roles allow                                      | Your access, through the agent's own sign-in                |
+| Expiry and revoking | You choose the expiry; revoke from _Profile → Connected apps_ | No expiry; rotate it from _Profile → API keys_                   | Handled through the agent's own sign-in                     |
 
-Use a grant token when an agent should be able to do less than you can.
+Only the grant sign-in opens the dashboard. An API key is never fetched for you: pass it with `--token` (or `SG_API_KEY`). Without `--auth`, a key you pass, or one saved by an earlier `--token` run, selects the API key; otherwise you sign in for a grant.
 
 ### Grant tokens
 
-`npx add-sg-mcp --auth grant --region eu` (optionally `--org my-org`) asks the StackGuardian OAuth broker for a **grant token** instead of using your API key. The browser opens a consent page where you pick the organization, the roles the agent may use and how long the grant should last; the CLI receives an `sgat_` token on a loopback callback and writes it to each agent as an `Authorization: Bearer` header.
+`npx add-sg-mcp` (optionally `--region eu --org my-org`) asks the StackGuardian OAuth broker for a **grant token** instead of using your API key. The browser opens a consent page where you pick the organization, the roles the agent may use and how long the grant should last; the CLI receives an `sgat_` token on a loopback callback and writes it to each agent as an `Authorization: Bearer` header.
 
 - The token is bound to **one organization and the roles you approved** — it is not your full user key, so an agent can be given less than you have.
 - `npx add-sg-mcp status` shows `expires <date>`, `no expiry` or `expired`. An expired grant is never reused; the next run asks for a new one.
 - `logout` revokes the saved grant and deletes the local copy. Revoke a grant any time from _Profile → Connected apps_ in the dashboard.
-- `npx add-sg-mcp login --auth grant` requests a fresh grant, then asks which agents to install it to.
+- `npx add-sg-mcp login` requests a fresh grant, then asks which agents to install it to.
+- If an API key is saved from an earlier `--token` run, `npx add-sg-mcp` keeps using it. Pass `--auth grant` to switch to a grant.
 
 ### OAuth (preview)
 
@@ -134,9 +136,9 @@ SG_API_KEY=sgu_… SG_ORG=my-org SG_REGION=eu npx add-sg-mcp -y -a claude-code
 
 **My agent gets "unauthorized" errors.** The credential in the agent's config no longer works:
 
-- API key rotated or deleted: run `npx add-sg-mcp login` and pick your agents to write the new key to them.
-- Grant expired: `npx add-sg-mcp --auth grant` asks for a new one.
-- Grant revoked: run `npx add-sg-mcp login --auth grant` and pick your agents.
+- API key rotated or deleted: run `npx add-sg-mcp --token <new-key> --org <org> --region <eu|us>` to write the new key to your agents.
+- Grant expired: `npx add-sg-mcp` asks for a new one.
+- Grant revoked: run `npx add-sg-mcp login` and pick your agents.
 
 **The skills don't appear.** Restart the agent. Mastra Code and MCPorter have no skills support, so they get the server only. `--skip-skills` skips them on purpose.
 
@@ -162,12 +164,12 @@ npx add-sg-mcp [options]
                              the generated files are added to .gitignore
   -n, --name <name>          Server entry name (default: StackGuardian-<org>)
   --skip-skills              Do not install the skills
-  --token <api-key>          Use this API key instead of signing in (or SG_API_KEY)
+  --token <api-key>          Use this API key instead of signing in (or SG_API_KEY); needs --org
   --api-base <url>           API base for --token or --auth grant, in place of --region
   --no-browser               Print the sign-in link instead of opening a browser
   --login-timeout <seconds>  How long to wait for the browser (default 300)
   --dashboard-url <url>      Another dashboard (other environments, local dev)
-  --auth <apikey|grant|oauth> Credential mode (default apikey)
+  --auth <apikey|grant|oauth> Credential mode (default: apikey when a key is given, otherwise grant)
 ```
 
 | Command                                          | What it does                                                                                                                       |
@@ -218,9 +220,9 @@ Claude Code, Codex, Cursor, VS Code (Copilot), Gemini CLI, OpenCode, GitHub Copi
 
 ### How it works
 
-1. `npx add-sg-mcp` starts a one-time callback listener on `127.0.0.1` and opens `https://app.stackguardian.io/orchestrator/cli-connect` (or the region you pick) in your browser.
-2. You sign in if needed and choose the organization to connect.
-3. The dashboard sends your organization API key back to the CLI on the loopback callback. The key is stored in `~/.config/add-sg-mcp/credentials.json` (mode `0600`).
+1. `npx add-sg-mcp` starts a one-time callback listener on `127.0.0.1` and opens the StackGuardian sign-in for your region in your browser.
+2. You sign in if needed and choose the organization, the roles the agent may use and how long the grant lasts.
+3. The browser returns a one-time code to the loopback callback, and the CLI exchanges it for a grant token. The token is stored in `~/.config/add-sg-mcp/credentials.json` (mode `0600`). With `--token`, steps 1 to 3 are skipped and the key you passed is stored instead.
 4. The CLI writes the server entry into each selected agent's own config file:
 
    ```json
@@ -229,24 +231,24 @@ Claude Code, Codex, Cursor, VS Code (Copilot), Gemini CLI, OpenCode, GitHub Copi
        "StackGuardian-<org>": {
          "type": "http",
          "url": "https://api.app.stackguardian.io/api/v1/orgs/<org>/mcp/",
-         "headers": { "Authorization": "apikey sgu_…" }
+         "headers": { "Authorization": "Bearer sgat_…" }
        }
      }
    }
    ```
 
-   (Codex gets the TOML equivalent, Goose YAML, and so on — each agent's native format.)
+   (Codex gets the TOML equivalent, Goose YAML, and so on — each agent's native format. With an API key the header is `apikey sgu_…`.)
 
 5. The skills are copied to `~/.agents/skills/` and symlinked into each agent's skills directory (`~/.claude/skills`, `~/.codex/skills`, `~/.cursor/skills`, …), so a single copy serves every agent.
 
 ### Security
 
 - On Windows there is no `0600` equivalent; the file relies on the ACL of your profile folder.
-- With `--auth apikey` (the default) the credential is your **user API key for the selected organization**: it acts as you, with your roles, and it does not expire on its own. Rotate it from _Profile → API keys_ in the dashboard if a machine is lost.
-- With `--auth grant` the credential is a **grant token bound to one organization and the roles you approved**, and it can carry an expiry. `logout` revokes it; you can also revoke it from _Profile → Connected apps_. For an API key `logout` only deletes the local copy — it never invalidates the key.
+- With an API key (`--token`) the credential is your **user API key for the selected organization**: it acts as you, with your roles, and it does not expire on its own. Rotate it from _Profile → API keys_ in the dashboard if a machine is lost.
+- With a grant (the default) the credential is a **grant token bound to one organization and the roles you approved**, and it can carry an expiry. `logout` revokes it; you can also revoke it from _Profile → Connected apps_. For an API key `logout` only deletes the local copy — it never invalidates the key.
 - By default nothing is written into project directories. `--project` warns and adds the generated files to `.gitignore`.
-- The CLI accepts a callback only when its one-time `state` matches, and only API hosts under `stackguardian.io` (or the host you passed with `--dashboard-url`).
-- `status` never prints the key or the grant token in full; the callback page strips the credential from the browser history, and a grant flow keeps its PKCE verifier off the front channel (only the one-time code travels through the browser).
+- The CLI accepts a callback only when its one-time `state` matches, and sends the code and the credential only to API hosts under `stackguardian.io` (or `localhost`, for local development).
+- `status` never prints the key or the grant token in full; the callback page strips the one-time code from the browser history, and the grant flow keeps its PKCE verifier off the front channel (only the one-time code travels through the browser).
 
 ## Contributing
 
