@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.6
+
+- `add-sg-mcp login` carries on after you sign in: it asks which coding agents should get the server, then installs the server and the skills, the same as `add-sg-mcp`. Before, it stopped at "Run add-sg-mcp to install the server and skills" and you had to run a second command. Without a terminal (CI, a pipe) `login` still only saves the credential.
+
 ## 1.0.5
 
 - Fix the arrow keys in the standalone executable's prompts. Each Up or Down press was written back to the terminal, so the list was redrawn a line lower or higher every time: the region and agent lists repeated down the screen, or overwrote the lines above them. The npm package (`npx add-sg-mcp`) was not affected.

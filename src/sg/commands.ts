@@ -543,6 +543,31 @@ function reportSkills(
   }
 }
 
+/** What the install step needs to know about the server it writes. */
+interface SgInstallTarget {
+  apiBase: string;
+  org: string;
+  headers: string[];
+  allowed: AgentType[];
+}
+
+function installTargetFor(credentials: SgCredentials): SgInstallTarget {
+  return {
+    apiBase: credentials.apiBase,
+    org: credentials.org,
+    headers: [buildAuthHeader(credentials)],
+    allowed: getAgentTypes().filter((a) => !PRESET_EXCLUDED_AGENTS.includes(a)),
+  };
+}
+
+function warnProjectScope(options: SgInstallOptions): void {
+  if (options.project) {
+    p.log.warn(
+      "Project scope writes the credential into files in this directory; they will be added to .gitignore.",
+    );
+  }
+}
+
 export async function runConnect(
   options: SgConnectOptions,
   deps: SgCommandDeps,
@@ -553,16 +578,9 @@ export async function runConnect(
   if (auth !== "apikey" && auth !== "grant" && auth !== "oauth") {
     fail(`--auth must be apikey, grant or oauth, got ${options.auth}`);
   }
-  if (options.project) {
-    p.log.warn(
-      "Project scope writes the credential into files in this directory; they will be added to .gitignore.",
-    );
-  }
+  warnProjectScope(options);
 
-  let apiBase: string;
-  let org: string;
-  let headers: string[] = [];
-  let allowed: AgentType[];
+  let target: SgInstallTarget;
 
   if (auth === "oauth") {
     p.log.info(
@@ -582,7 +600,7 @@ export async function runConnect(
       p.cancel("Cancelled");
       process.exit(0);
     }
-    org = orgInput as string;
+    const org = orgInput as string;
     if (!isValidOrg(org)) fail(`Invalid organization name: ${org}`);
     const region =
       options.region ??
@@ -597,23 +615,31 @@ export async function runConnect(
         `--api-base must be an https StackGuardian host, got ${options.apiBase}`,
       );
     }
-    apiBase = options.apiBase ?? env.apiBase;
-    allowed = OAUTH_CAPABLE_AGENTS.filter(
-      (a) => !PRESET_EXCLUDED_AGENTS.includes(a),
-    );
+    target = {
+      apiBase: options.apiBase ?? env.apiBase,
+      org,
+      headers: [],
+      allowed: OAUTH_CAPABLE_AGENTS.filter(
+        (a) => !PRESET_EXCLUDED_AGENTS.includes(a),
+      ),
+    };
   } else {
-    const credentials =
+    target = installTargetFor(
       auth === "grant"
         ? await credentialsFromGrant(options)
-        : await resolveCredentials(options);
-    apiBase = credentials.apiBase;
-    org = credentials.org;
-    headers = [buildAuthHeader(credentials)];
-    allowed = getAgentTypes().filter(
-      (a) => !PRESET_EXCLUDED_AGENTS.includes(a),
+        : await resolveCredentials(options),
     );
   }
 
+  await installServerAndSkills(target, options, deps);
+}
+
+/** Agent pick, server entry, skills and the closing note: everything after the credential. */
+async function installServerAndSkills(
+  { apiBase, org, headers, allowed }: SgInstallTarget,
+  options: SgConnectOptions,
+  deps: SgCommandDeps,
+): Promise<void> {
   const targetAgents = await chooseAgents(options, deps, allowed);
   const url = buildMcpUrl(apiBase, org);
   const outcome = await deps.main(url, {
@@ -670,11 +696,17 @@ export async function runLogin(
   const credentials = grant
     ? await credentialsFromGrant(options, true)
     : await resolveCredentials(options, true);
-  p.outro(
-    grant
-      ? `Grant saved for ${chalk.cyan(credentials.org)}. Run ${chalk.cyan("add-sg-mcp --auth grant")} to install the server and skills.`
-      : `Signed in to ${chalk.cyan(credentials.org)}. Run ${chalk.cyan("add-sg-mcp")} to install the server and skills.`,
-  );
+  // Without a terminal nobody can pick agents, so login stops at the saved credential.
+  if (!isInteractive()) {
+    p.outro(
+      grant
+        ? `Grant saved for ${chalk.cyan(credentials.org)}. Run ${chalk.cyan("add-sg-mcp --auth grant")} to install the server and skills.`
+        : `Signed in to ${chalk.cyan(credentials.org)}. Run ${chalk.cyan("add-sg-mcp")} to install the server and skills.`,
+    );
+    return;
+  }
+  warnProjectScope(options);
+  await installServerAndSkills(installTargetFor(credentials), options, deps);
 }
 
 export async function runLogout(
@@ -900,7 +932,7 @@ export function registerSgCommands(
     program
       .command("login")
       .description(
-        "Sign in through the StackGuardian dashboard and save the credential",
+        "Sign in through the StackGuardian dashboard, save the credential, then pick the agents to install to",
       ),
   ).action(async (_options: SgAuthOptions, command: Command) => {
     await runLogin(command.optsWithGlobals() as SgConnectOptions, deps);
