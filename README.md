@@ -96,7 +96,7 @@ Only the grant sign-in opens the dashboard. An API key is never fetched for you:
 - The token is bound to **one organization and the roles you approved** — it is not your full user key, so an agent can be given less than you have.
 - `npx add-sg-mcp status` shows `expires <date>`, `no expiry` or `expired`. An expired grant is never reused; the next run asks for a new one.
 - `logout` revokes the saved grant and deletes the local copy. Revoke a grant any time from _Profile → Connected apps_ in the dashboard.
-- `npx add-sg-mcp login` requests a fresh grant without touching agent configs.
+- `npx add-sg-mcp login` requests a fresh grant, then asks which agents to install it to.
 - If an API key is saved from an earlier `--token` run, `npx add-sg-mcp` keeps using it. Pass `--auth grant` to switch to a grant.
 
 ### OAuth (preview)
@@ -108,7 +108,7 @@ Only the grant sign-in opens the dashboard. An API key is never fetched for you:
 | To                             | Run                                                                                                                                                                                                                     |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Connect another agent          | `npx add-sg-mcp -a cursor` (`npx add-sg-mcp list-agents` shows the names)                                                                                                                                               |
-| Connect another organization   | `npx add-sg-mcp login --org other-org --region eu`, then `npx add-sg-mcp`. It gets its own `StackGuardian-other-org` entry next to the first.                                                                           |
+| Connect another organization   | `npx add-sg-mcp login --org other-org --region eu`, then pick your agents. It gets its own `StackGuardian-other-org` entry next to the first.                                                                           |
 | Disconnect one organization    | `npx add-sg-mcp remove --name StackGuardian-<org>`. The skills stay for the organizations you keep.                                                                                                                     |
 | Update the tool and the skills | `npx add-sg-mcp@latest`, or run the install script again. Each run refreshes the skills.                                                                                                                                |
 | See what's installed           | `npx add-sg-mcp status`                                                                                                                                                                                                 |
@@ -138,7 +138,7 @@ SG_API_KEY=sgu_… SG_ORG=my-org SG_REGION=eu npx add-sg-mcp -y -a claude-code
 
 - API key rotated or deleted: run `npx add-sg-mcp --token <new-key> --org <org> --region <eu|us>` to write the new key to your agents.
 - Grant expired: `npx add-sg-mcp` asks for a new one.
-- Grant revoked: run `npx add-sg-mcp login`, then `npx add-sg-mcp`.
+- Grant revoked: run `npx add-sg-mcp login` and pick your agents.
 
 **The skills don't appear.** Restart the agent. Mastra Code and MCPorter have no skills support, so they get the server only. `--skip-skills` skips them on purpose.
 
@@ -172,13 +172,13 @@ npx add-sg-mcp [options]
   --auth <apikey|grant|oauth> Credential mode (default: apikey when a key is given, otherwise grant)
 ```
 
-| Command                                          | What it does                                                                   |
-| ------------------------------------------------ | ------------------------------------------------------------------------------ |
-| `npx add-sg-mcp login`                           | Sign in again (switch organization or region) without touching agent configs   |
-| `npx add-sg-mcp status`                          | Show the saved credential (masked) and which agents have the server and skills |
-| `npx add-sg-mcp remove [-a <agent>] [--project]` | Remove the server entry and the skills from your agents                        |
-| `npx add-sg-mcp logout [--purge]`                | Forget the credential; `--purge` also runs `remove`                            |
-| `npx add-sg-mcp list-agents`                     | List supported agents and their config files                                   |
+| Command                                          | What it does                                                                                                                       |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `npx add-sg-mcp login`                           | Sign in again (switch organization or region), then pick the agents to install to. Without a terminal it only saves the credential |
+| `npx add-sg-mcp status`                          | Show the saved credential (masked) and which agents have the server and skills                                                     |
+| `npx add-sg-mcp remove [-a <agent>] [--project]` | Remove the server entry and the skills from your agents                                                                            |
+| `npx add-sg-mcp logout [--purge]`                | Forget the credential; `--purge` also runs `remove`                                                                                |
+| `npx add-sg-mcp list-agents`                     | List supported agents and their config files                                                                                       |
 
 `remove` and `logout --purge` take every `StackGuardian-<org>` entry and the skills out. `remove --name <entry>` takes out just that entry and keeps the skills.
 

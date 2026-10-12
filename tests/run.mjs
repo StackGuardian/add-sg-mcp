@@ -30,6 +30,7 @@ const E2E = [
   "tests/e2e/install.test.ts",
   "tests/e2e/cli.test.ts",
   "tests/e2e/sg-cli.test.ts",
+  "tests/e2e/sg-login-tty.test.ts",
   "tests/e2e/sg-binary.test.ts",
   "tests/e2e/sg-install-script.test.ts",
 ];
