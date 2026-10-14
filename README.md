@@ -124,7 +124,7 @@ npx add-sg-mcp --token sgu_… --org my-org --region eu -y --all
 SG_API_KEY=sgu_… SG_ORG=my-org SG_REGION=eu npx add-sg-mcp -y -a claude-code
 ```
 
-`--api-base https://…/api/v1` replaces `--region` for non-standard environments. In a Docker image, `curl -fsSL …/install.sh | ADD_SG_MCP_NO_RUN=1 sh` installs the executable without running it.
+`--api-base https://…/api/v1` replaces `--region` for non-standard environments. In a Docker image, `curl -fsSL https://dl.stackguardian.io/add-sg-mcp/install.sh | ADD_SG_MCP_NO_RUN=1 sh` installs the executable without running it.
 
 ## Troubleshooting
 
@@ -203,9 +203,9 @@ Environment variables (with `curl | sh`, set them on the `sh` side: `… | ADD_S
 | `ADD_SG_MCP_DOWNLOAD_URL` | Base URL of a mirror that serves the release files                                                                        |
 | `ADD_SG_MCP_NO_RUN`       | `1` installs without running `add-sg-mcp`                                                                                 |
 
-Builds exist for macOS (Apple Silicon, Intel), Linux with glibc (x64, arm64) and Windows x64. To install by hand, download `add-sg-mcp-<os>-<arch>.tar.gz` (or `add-sg-mcp-windows-x64.zip`) from the release and put the executable on your `PATH`. `gh attestation verify <file> --repo StackGuardian/add-sg-mcp` confirms that a file was built by this repository's workflow.
+Builds exist for macOS (Apple Silicon, Intel), Linux with glibc (x64, arm64) and Windows x64. To install by hand, download `https://dl.stackguardian.io/add-sg-mcp/v<version>/add-sg-mcp-<os>-<arch>.tar.gz` (or `add-sg-mcp-windows-x64.zip`) and put the executable on your `PATH`; `https://dl.stackguardian.io/add-sg-mcp/latest` names the newest version, and `SHA256SUMS` sits next to the archives. `gh attestation verify <file> --repo StackGuardian/add-sg-mcp` confirms that a file was built by this repository's workflow.
 
-The installer downloads from `dl.stackguardian.io`, which has every release from 1.0.4 on. The same files are attached to each [GitHub release](https://github.com/StackGuardian/add-sg-mcp/releases); to install from there, or to install an older release, set `ADD_SG_MCP_DOWNLOAD_URL=https://github.com/StackGuardian/add-sg-mcp/releases/download/v1.0.3`.
+`dl.stackguardian.io` has every release from 1.0.4 on.
 
 The executables are not yet notarized by Apple or code-signed for Windows. The install scripts are not affected, but a browser download is quarantined on macOS and may show a SmartScreen prompt on Windows (_More info → Run anyway_).
 
