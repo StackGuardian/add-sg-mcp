@@ -2,7 +2,6 @@
 name: sg-update-workflow
 description: Guided flow for changing an existing StackGuardian workflow's settings via the StackGuardian MCP update_workflow tool — locate the workflow, then change any of description/tags, cloud connector, environment variables, Terraform options, custom step pipelines (CUSTOM workflows), approvals, runner placement, cron schedules, post-run notifications/chaining/webhooks, runner cache, job sizing, activation, or template inputs. Only the fields you change are touched. Use when the user wants to edit/modify/reconfigure an existing workflow's settings (NOT to upgrade its template revision — that's the sg-upgrade-workflow skill).
 ---
-
 # Update Workflow — Guided Flow
 
 Change an existing workflow's settings with the StackGuardian MCP
@@ -51,12 +50,12 @@ and stop, don't rebuild the payload by hand.
      otherwise)
      A path like `/wfgrps/dev/wfs/api` gives `wfGrp="dev"`, `resourceName="api"`.
      A path like `/wfgrps/dev/stacks/net/wfs/api` adds `stack="net"`.
-     **Nested workflow groups** are real and `update_workflow` accepts them: in
-     `/wfgrps/platform/eu/wfs/api` the group is the whole `"platform/eu"`, NOT
-     `"platform"`. Taking only the first segment silently targets a different
-     group — usually a 404, or the wrong workflow if a same-named one exists
-     there. Keep the inner slashes exactly as they appear; don't URL-encode them
-     and don't collapse them. (Only `..` and backslashes are rejected.)
+   **Nested workflow groups** are real and `update_workflow` accepts them: in
+   `/wfgrps/platform/eu/wfs/api` the group is the whole `"platform/eu"`, NOT
+   `"platform"`. Taking only the first segment silently targets a different
+   group — usually a 404, or the wrong workflow if a same-named one exists
+   there. Keep the inner slashes exactly as they appear; don't URL-encode them
+   and don't collapse them. (Only `..` and backslashes are rejected.)
 
 ## Step B — Decide what to change
 
@@ -76,9 +75,9 @@ Ask the user what they want to change, then build ONLY those parameters:
     deletes the other two and reports success. Whenever the user wants to ADD
     a tag, read the current list first (it's on the `search_workflows` result
     you already have from Step A) and send the full intended set.
-    (The `contextTags` merge is the tool's doing — it reads the current workflow
-    and merges before sending, because the platform overwrites the whole map
-    either way.)
+  (The `contextTags` merge is the tool's doing — it reads the current workflow
+  and merges before sending, because the platform overwrites the whole map
+  either way.)
 - **Cloud connector** (`deployment`) — `{"connectorId": "/integrations/<id>"}`.
   Find connectors via
   `search_orchestrator_resources(resourceTypes=['INTEGRATION.CLOUD'])`. The
@@ -92,7 +91,7 @@ Ask the user what they want to change, then build ONLY those parameters:
   verified live; an unknown one returns `availableSecrets`.
 - **Terraform/OpenTofu options** (`terraformConfig`) — pass only the keys to
   change, e.g. `{"terraformVersion": "1.6.2"}` or `{"driftCheck": true,
-"driftCron": "0 */6 * * ? *"}`. Keys you omit are kept, and a key set to
+  "driftCron": "0 */6 * * ? *"}`. Keys you omit are kept, and a key set to
   `null` is removed. That preservation is the tool's, not the platform's: it
   reads the workflow and merges your partial into the stored options before
   sending. So if the read fails the update is refused outright rather than
@@ -129,7 +128,7 @@ Ask the user what they want to change, then build ONLY those parameters:
   `wfStepInputData.data` are NOT verified by the platform). Cannot be combined
   with a template upgrade: upgrade first, then adjust the steps.
 - **Approvals** (`approvals`) — `{"approvers": [...],
-"numberOfApprovalsRequired": N}`. REPLACES the stored approval settings, so
+  "numberOfApprovalsRequired": N}`. REPLACES the stored approval settings, so
   send the full intended state. Two settings make a gate: whether a run stops
   is `terraformConfig.approvalPreApply` (TERRAFORM/OPENTOFU) or a step's own
   `approval: true` (CUSTOM); `approvals` only says who may release it, and a
@@ -207,7 +206,6 @@ else stays the same). On confirmation, call `update_workflow` with `wfGrp`,
 ## Error handling (teaching errors)
 
 Present the offered options and re-call — don't guess:
-
 - `availableConnectors` -> unknown `deployment` connector; present list, re-call.
 - `availableSecrets` -> a referenced `/secrets/<name>` doesn't exist; present
   list or create the secret first.

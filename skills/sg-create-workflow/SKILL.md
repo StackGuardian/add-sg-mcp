@@ -26,11 +26,10 @@ the **StackGuardian template library** or from **their own git repository**?
 Ask — don't infer it from a stray URL or template name. Build exactly one of
 these two shapes for `source` — never both, and never mix fields from one
 into the other:
-
 - `{"type": "template", "templateId": ..., "iacInputs": {...}}`
 - `{"type": "git", "repo": ..., "ref": ..., "workingDir": ...,
-"isPrivateRepo": ..., "gitAuthRef": ..., "includeSubModule": ...,
-"iacInputs": {...}}`
+  "isPrivateRepo": ..., "gitAuthRef": ..., "includeSubModule": ...,
+  "iacInputs": {...}}`
 
 ### Template mode
 
@@ -42,6 +41,13 @@ into the other:
    Always pin the revision; never pass an unpinned template id.
 3. Immediately call `get_marketplace_template_by_id` with that id and keep the
    `InputSchemas` for Step D.
+4. **Draft vs published.** Each revision's `IsPublic` says whether it is
+   published (`"1"`) or still a **draft** (`"0"`). When presenting revisions,
+   label each one. A draft is allowed — it is how a template author tests
+   one — but tell the user plainly that it is unpublished, can still change
+   under the workflow, and is not for production; let them continue if they
+   want. Never block on it, and never silently pick a draft. (The tool
+   repeats this as a `warnings` entry in its response.)
 
 ### Git mode
 
@@ -78,7 +84,7 @@ into the other:
    or "recommend" arbitrary groups:
    - **Name or keyword**: resolve it via
      `search_orchestrator_resources(resourceTypes=['WORKFLOW_GROUP'],
-searchQuery=<keyword>)`; on a near-miss suggest the closest match
+     searchQuery=<keyword>)`; on a near-miss suggest the closest match
      ("no `production` — did you mean `prod`?"). The confirmed pick becomes
      `wfGrp` — pass EVERYTHING AFTER `/wfgrps/` IN ITS `ResourceId` (e.g.
      `mcp-test-qypm75mb` from `/wfgrps/mcp-test-qypm75mb`, and the whole
@@ -93,12 +99,12 @@ searchQuery=<keyword>)`; on a near-miss suggest the closest match
      user explicitly asks for a brand-new group.
    - **Browse in the dev portal**: share the workflow-groups page —
      `https://app.stackguardian.io/orchestrator/orgs/<org>?tab=workflowGroups`.
-     This step is mandatory — never call `create_workflow` without a
-     user-confirmed `wfGrp`.
-     **Nested groups are accepted** — `PROD/eu-central-1` is a real group that
-     holds workflows. Pass the whole path exactly as it appears; the last
-     segment alone is a different group. A full resource id is not a group
-     path — drop any `/wfs/...` or `/stacks/...` part.
+   This step is mandatory — never call `create_workflow` without a
+   user-confirmed `wfGrp`.
+   **Nested groups are accepted** — `PROD/eu-central-1` is a real group that
+   holds workflows. Pass the whole path exactly as it appears; the last
+   segment alone is a different group. A full resource id is not a group
+   path — drop any `/wfs/...` or `/stacks/...` part.
 2. Ask the user for:
    - workflow name (`resourceName`, 1–100 chars)
    - optional description (max 512 chars)
@@ -149,9 +155,9 @@ their own container/script rather than Terraform.
    the workflow's own.
    Each step is:
    `{"name": "<slug>", "wfStepTemplateId": "/owner/name:rev",
-"wfStepInputData": {"schemaType": "FORM_JSONSCHEMA", "data": {...}},
-"approval": false, "timeout": 5400, "environmentVariables": [...],
-"mountPoints": [...]}`
+     "wfStepInputData": {"schemaType": "FORM_JSONSCHEMA", "data": {...}},
+     "approval": false, "timeout": 5400, "environmentVariables": [...],
+     "mountPoints": [...]}`
    Only `name` and `wfStepTemplateId` are required.
 4. Rules worth knowing before you call:
    - `approval: true` pauses the run for manual approval BEFORE that step —
@@ -215,14 +221,13 @@ Defaults are agent-safe; only surface these if the user asks or they matter.
 Each bullet below is a top-level `create_workflow` parameter — build the
 nested object only if you have something to put in it, and omit the
 parameter entirely otherwise (its defaults still apply omitted):
-
 - `wfType`: TERRAFORM (default), OPENTOFU, or CUSTOM (see Step C2 below).
   Note ANSIBLE / HELM / KUBERNETES / CLOUDFORMATION are NOT workflow types —
   they are search filters for CUSTOM workflows whose step template matches
   that keyword. To build one, use `wfType: CUSTOM` with the matching step
   template.
 - `terraformConfig`: `{"approvalPreApply": true, "managedTerraformState": true,
-"driftCheck": false, "terraformVersion": ..., "driftCron": ...}` — these
+  "driftCheck": false, "terraformVersion": ..., "driftCron": ...}` — these
   three booleans already match this tool's agent-safe defaults, so omit the
   whole object unless something needs to differ. `driftCron` (AWS cron) is
   stored independently of `driftCheck` — a schedule set while `driftCheck` is
@@ -256,8 +261,8 @@ parameter entirely otherwise (its defaults still apply omitted):
   ...) — chain other workflows or stacks, send email notifications, fire
   webhooks:
   `{"wfChaining": {"COMPLETED": [{"workflowGroupId": ..., "workflowId": ...}]},
-"notifications": {"email": {"COMPLETED": [{"recipients": [...]}]}},
-"webhooks": {"COMPLETED": [{"webhookName": ..., "webhookUrl": ...}]}}`.
+  "notifications": {"email": {"COMPLETED": [{"recipients": [...]}]}},
+  "webhooks": {"COMPLETED": [{"webhookName": ..., "webhookUrl": ...}]}}`.
   All three groups and every event key are optional. A `stackId` can stand in
   for `workflowId` when chaining to a stack. `DRIFT_DETECTED` only ever fires
   when `terraformConfig.driftCheck` is enabled — don't offer it otherwise.
@@ -270,7 +275,7 @@ parameter entirely otherwise (its defaults still apply omitted):
   chaining) — omit it and scheduled runs use the workflow's own settings.
 - `cacheConfig`: persist runner directories between runs so repeats
   warm-start — `{"enabled": true, "paths": [".terraform"], "key":
-"tf-plugins-v1", "policy": "PULL_PUSH"}`. If you pass it at all, all four of
+  "tf-plugins-v1", "policy": "PULL_PUSH"}`. If you pass it at all, all four of
   `enabled`/`paths`/`key`/`policy` are REQUIRED. `key` is slug format
   (letters, digits, `_`, `-`); runs sharing a key share the cache, so change
   it to force a fresh one. `policy` is PULL_PUSH (restore + save, typical),
@@ -299,7 +304,6 @@ call `create_workflow` with all parameters.
 
 The tool validates live and returns actionable errors instead of opaque 400s.
 On error, present the offered options and re-call — do not guess:
-
 - `availableWorkflowGroups` → unknown group; a list of group IDS (capped
   at 50) — re-call with one verbatim; `availableWorkflowGroupNames`
   maps any id whose display name differs, show those to the user; plus

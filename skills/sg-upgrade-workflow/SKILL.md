@@ -28,6 +28,10 @@ gives `wfGrp="platform/eu"`, not `"platform"`.
 
 1. Find the template with `search_marketplace_templates(templateType='IAC')`
    (add `searchQuery`). Present revisions; let the user pick the target one.
+   Label each revision **draft** or **published** from its `IsPublic`
+   (`"0"` / `"1"`): moving a workflow onto a draft is allowed but must be
+   said out loud — it is unpublished, can still change, and is not for
+   production. Warn, don't block.
 2. Note its pinned `/owner/name:rev` id (e.g. `/stackguardian/simple-ec2:12`) —
    this becomes `source.templateId`. Then call
    `get_marketplace_template_by_id` on it — not optional, since Step E has to
@@ -36,7 +40,6 @@ gives `wfGrp="platform/eu"`, not `"platform"`.
 ## Step C — Choose the upgrade mode
 
 Explain the two modes plainly and let the user choose:
-
 - **Keep my settings** (`upgradeMode="PRESERVE_SETTINGS"`) — upgrade the code but
   preserve the customizations the user made on this workflow (e.g. extra
   approvers, a pinned Terraform version). New env-var keys from the template are
@@ -52,7 +55,6 @@ Call `update_workflow` with `dryRun=true`:
 "templateId":"<new rev>"}, upgradeMode=<mode>, dryRun=true)`.
 
 This mutates nothing. Present the returned `preview` to the user:
-
 - `summary` — how many settings are added / modified / removed.
 - `changes` — the specific before/after per key.
 - `reviewDimensions` — the four things worth reviewing: template **iacInputs**,
