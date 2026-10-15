@@ -1,4 +1,6 @@
-> **Fork note:** this pipeline was inherited from upstream `add-mcp`. Before the first release, an npm owner of `add-sg-mcp` must register the Trusted Publisher for the `StackGuardian/add-sg-mcp` repository and the `release.yml` workflow (see the one-time setup below); nothing publishes until that is done.
+> **Fork note:** this pipeline was inherited from upstream `add-mcp`. Before the first release, an npm owner of `add-sg-mcp` must register the Trusted Publisher for the `StackGuardian/stackguardian-mcp` repository and the `release.yml` workflow (see the one-time setup below); nothing publishes until that is done.
+
+> **Rename note:** the repository was renamed from `StackGuardian/add-sg-mcp` to `StackGuardian/stackguardian-mcp`; the npm package and the CLI keep the name `add-sg-mcp`. GitHub's OIDC tokens carry the repository's current name, so every binding to the old name must be updated: the npm Trusted Publisher (B1), and the trust policy of the AWS role that `binaries.yml` assumes to upload to `dl.stackguardian.io` if it names the repository. Releases up to 1.0.6 were attested under the old name and verify with `gh attestation verify <file> --repo StackGuardian/add-sg-mcp`.
 
 # Releasing `add-sg-mcp`
 
@@ -32,7 +34,7 @@ flowchart LR
 
 ### Defensive primitives in play
 
-- **npm Trusted Publishing (OIDC)** — npm only accepts a publish from `release.yml` in `StackGuardian/add-sg-mcp`, authenticated by a short-lived OIDC token GitHub mints per run. No long-lived tokens exist anywhere.
+- **npm Trusted Publishing (OIDC)** — npm only accepts a publish from `release.yml` in `StackGuardian/stackguardian-mcp`, authenticated by a short-lived OIDC token GitHub mints per run. No long-lived tokens exist anywhere.
 - **npm provenance attestation** — every published version is cryptographically signed via Sigstore and bound to the exact GitHub commit and workflow that built it. Anyone can run `npm audit signatures` to verify.
 - **"Require 2FA and disallow tokens"** on the package — registry-side switch that refuses any publish that is not OIDC + 2FA, even if an attacker steals a legacy token.
 - **npm staged publishing** — `release.yml` runs `npm stage publish`, not `npm publish`. The tarball lands in a staging area; the maintainer inspects it and approves with WebAuthn before it goes live.
@@ -57,7 +59,7 @@ Work through these top to bottom. None of them can be automated; they are all in
 
 - [ ] **B1.** Go to `https://www.npmjs.com/package/add-sg-mcp/access`. Under **Trusted Publisher**, click **GitHub Actions** and enter:
   - Organization: `StackGuardian`
-  - Repository: `add-sg-mcp`
+  - Repository: `stackguardian-mcp`
   - Workflow filename: `release.yml`
   - Allowed actions: select **`npm stage publish` only**. **Do not** check `npm publish`.
   - Save.
@@ -66,7 +68,7 @@ Work through these top to bottom. None of them can be automated; they are all in
 
 - [ ] **B2.** On the same page, find **Publishing access** and choose **"Require two-factor authentication and disallow tokens"**. Save. From this point any publish that is not OIDC + 2FA-approved staged release is rejected by the registry.
 
-### C. GitHub repository configuration (`StackGuardian/add-sg-mcp`)
+### C. GitHub repository configuration (`StackGuardian/stackguardian-mcp`)
 
 - [ ] **C1.** Settings -> Rules -> Rulesets -> **New tag ruleset**. Name it "release tags". Target tags matching `v*`. Enable "Restrict creations", "Restrict updates", and "Restrict deletions". Add yourself (and any future co-maintainers) to the bypass list. Save.
 - [ ] **C2.** Settings -> Actions -> General -> **Workflow permissions** = "Read repository contents and packages permissions" (the more restrictive of the two radio buttons). Job-level `id-token: write` in `release.yml` still works because workflow files can request additional permissions explicitly, but they cannot exceed what the repo allows globally.
@@ -75,7 +77,7 @@ Work through these top to bottom. None of them can be automated; they are all in
 
 ### D. First-release smoke test
 
-- [ ] **D1.** Cut a patch release through the runbook below (e.g. `v1.9.1` with an empty CHANGELOG entry like "internal: validate release pipeline"). Walk through the stage-review step slowly: open the staged tarball on npmjs.com, confirm the file list matches `package.json#files` (`dist/`, `README.md`), confirm the provenance attestation badge appears, then approve. Once the version is live, run `npm audit signatures add-sg-mcp@1.9.1` to verify Sigstore signatures end to end.
+- [ ] **D1.** Cut a patch release through the runbook below (e.g. `v1.9.1` with an empty CHANGELOG entry like "internal: validate release pipeline"). Walk through the stage-review step slowly: open the staged tarball on npmjs.com, confirm the file list matches `package.json#files` (`dist/`, `skills/`, `README.md`), confirm the provenance attestation badge appears, then approve. Once the version is live, run `npm audit signatures add-sg-mcp@1.9.1` to verify Sigstore signatures end to end.
 
 ## Per-release runbook
 
@@ -95,7 +97,7 @@ Follow this every time you ship a new version. The whole sequence is typically 5
    - Commit as `chore: release vX.Y.Z` and push to `main`.
 
 4. **Draft and publish the GitHub Release.**
-   - On `https://github.com/StackGuardian/add-sg-mcp/releases`, click **Draft a new release**.
+   - On `https://github.com/StackGuardian/stackguardian-mcp/releases`, click **Draft a new release**.
    - "Choose a tag" -> type `vX.Y.Z` (must match `package.json#version`; the workflow will fail fast if they disagree).
    - Target: `main`.
    - Title: `vX.Y.Z`.
@@ -115,7 +117,7 @@ Follow this every time you ship a new version. The whole sequence is typically 5
 
    Verify:
    - The version number matches what you intended.
-   - The file list is exactly `dist/` plus `README.md` (whatever `package.json#files` whitelists), with no surprise files.
+   - The file list is exactly `dist/`, `skills/` and `README.md` (whatever `package.json#files` whitelists), with no surprise files.
    - The shasum matches the workflow run's published artifact.
    - The provenance attestation references the correct commit SHA.
 
@@ -138,7 +140,7 @@ Follow this every time you ship a new version. The whole sequence is typically 5
 9. **If anything looked wrong at step 6, reject instead of approving.**
 
    ```bash
-   npm stage reject add-mcp
+   npm stage reject add-sg-mcp
    ```
 
    Nothing is published. Investigate, fix on a branch, cut a new patch release.
@@ -166,7 +168,7 @@ Follow this every time you ship a new version. The whole sequence is typically 5
 2. Audit `main`, the `release.yml` workflow, and the `v*` tag history.
 3. Once clean, re-enable the trusted publisher and ship a clean release.
 
-Note: even without step 1, an attacker cannot directly publish from a PR branch or a fork because OIDC only accepts publishes from `release.yml` on `StackGuardian/add-sg-mcp`'s default branch flow. Tag protection prevents them from triggering the real `release.yml`. Step 1 is belt and braces.
+Note: even without step 1, an attacker cannot directly publish from a PR branch or a fork because OIDC only accepts publishes from `release.yml` on `StackGuardian/stackguardian-mcp`'s default branch flow. Tag protection prevents them from triggering the real `release.yml`. Step 1 is belt and braces.
 
 ### Emergency publish when CI is broken
 

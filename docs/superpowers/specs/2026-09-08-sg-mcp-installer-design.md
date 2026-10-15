@@ -4,6 +4,8 @@ Date: 2026-09-08
 Status: approved for implementation (autonomous session; see "Decisions")
 Repo: `StackGuardian/add-sg-mcp` (fork of `neon-solutions/add-mcp` v2.4.0)
 
+> The repository has since been renamed to `StackGuardian/stackguardian-mcp`. The npm package and CLI are still `add-sg-mcp`. References below keep the name in use when this design was written.
+
 ## 1. Goal
 
 One command connects a developer's coding agents to the StackGuardian MCP
