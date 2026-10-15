@@ -53,7 +53,14 @@ test("bundled skills exist and their frontmatter names match the directory", () 
   const dir = bundledSkillsDir();
   assert.deepStrictEqual(
     [...SG_SKILL_NAMES],
-    ["sg-create-workflow", "sg-update-workflow", "sg-upgrade-workflow"],
+    [
+      "sg-create-workflow",
+      "sg-update-workflow",
+      "sg-upgrade-workflow",
+      "sg-create-stack",
+      "sg-create-policy",
+      "sg-manage-secrets",
+    ],
   );
   for (const name of SG_SKILL_NAMES) {
     const skill = readFileSync(join(dir, name, "SKILL.md"), "utf-8");
@@ -63,7 +70,9 @@ test("bundled skills exist and their frontmatter names match the directory", () 
       `${name} frontmatter`,
     );
     assert.ok(
-      !/\b(?<!sg-)(create|update|upgrade)-workflow\b/.test(skill),
+      !/\b(?<!sg-)((create|update|upgrade)-workflow|create-stack|create-policy|manage-secrets)\b/.test(
+        skill,
+      ),
       `${name} still references an unprefixed skill`,
     );
   }

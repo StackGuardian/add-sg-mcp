@@ -44,7 +44,7 @@ With the standalone executable, run `add-sg-mcp` wherever this README says `npx 
 
 ## Check that it works
 
-- **Claude Code:** run `/mcp`. `StackGuardian-<org>` should be listed, and the skills show up as `/sg-create-workflow`, `/sg-update-workflow` and `/sg-upgrade-workflow`.
+- **Claude Code:** run `/mcp`. `StackGuardian-<org>` should be listed, and the skills show up as `/sg-create-workflow`, `/sg-update-workflow`, `/sg-upgrade-workflow`, `/sg-create-stack`, `/sg-create-policy` and `/sg-manage-secrets`.
 - **Any agent:** `npx add-sg-mcp status` shows your saved sign-in and which agents have the server and the skills.
 - Ask your agent something small, such as _"Show my five most recent StackGuardian workflow runs and their status."_
 
@@ -69,13 +69,16 @@ Tools that create, change, run or delete things act on your real StackGuardian o
 
 The skills walk the agent through multi-step changes and ask you at each decision instead of guessing:
 
-| Skill                 | Use it to                                                                                                                                                                                  |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `sg-create-workflow`  | Create a workflow from a StackGuardian template or your own git repository (Terraform, OpenTofu or a custom step pipeline). You review the template's defaults before anything is created. |
-| `sg-update-workflow`  | Change an existing workflow's settings: connector, environment variables, schedules, approvals, runners, notifications and more. Only what you change is touched.                          |
-| `sg-upgrade-workflow` | Move a workflow to another template revision, with a dry run that shows the exact change first.                                                                                            |
+| Skill                 | Use it to                                                                                                                                                                                  | Try saying                                                                              |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| `sg-create-workflow`  | Create a workflow from a StackGuardian template or your own git repository (Terraform, OpenTofu or a custom step pipeline). You review the template's defaults before anything is created. | "Deploy the S3 bucket template from the library into the `dev` workflow group."         |
+| `sg-update-workflow`  | Change an existing workflow's settings: connector, environment variables, schedules, approvals, runners, notifications and more. Only what you change is touched.                          | "Add a nightly 2 AM schedule to `prod-vpc`."                                            |
+| `sg-upgrade-workflow` | Move a workflow to another template revision, with a dry run that shows the exact change first.                                                                                            | "Upgrade `prod-vpc` to the latest revision of its template."                            |
+| `sg-create-stack`     | Create a stack: several workflows deployed together from a stack template, in a set order. You review each workflow's inputs. Nothing runs until you start it.                             | "Create a stack that sets up a VPC, a security group and an EC2 instance in `staging`." |
+| `sg-create-policy`    | Add a guardrail that blocks, warns on, or requires approval for infrastructure changes, using a library policy, a Tirith rule or your own Rego.                                            | "Block any deployment in the `prod` group that makes an S3 bucket public."              |
+| `sg-manage-secrets`   | Store, rotate or delete vault secrets, and use them in workflows.                                                                                                                          | "Store a GitHub token as a secret called `GITHUB_TOKEN`."                               |
 
-In Claude Code, start one with `/sg-create-workflow` and so on. Other agents pick up a skill when your request matches it, for example _"Deploy the AWS VPC template to the networking workflow group."_
+In Claude Code, start one with `/sg-create-workflow` and so on. Other agents pick up a skill when your request matches it. For step-by-step walkthroughs and more examples, see [skills/README.md](skills/README.md).
 
 ## Choose how your agent signs in
 

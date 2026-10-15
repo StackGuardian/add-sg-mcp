@@ -116,6 +116,9 @@ test("the binary installs the server and the embedded skills", () => {
     "sg-create-workflow",
     "sg-update-workflow",
     "sg-upgrade-workflow",
+    "sg-create-stack",
+    "sg-create-policy",
+    "sg-manage-secrets",
   ]) {
     assert.strictEqual(
       read(join(home, ".claude", "skills", skill, "SKILL.md")),

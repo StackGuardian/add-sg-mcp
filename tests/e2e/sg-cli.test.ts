@@ -182,7 +182,7 @@ test("status reports the masked credential and installed agents; remove and logo
   assert.ok(!status.includes(KEY));
   assert.match(status, /Claude Code \(user\): StackGuardian-demo-org/);
   assert.match(status, /Codex \(user\): StackGuardian-demo-org/);
-  assert.match(status, /3 skills/);
+  assert.match(status, /6 skills/);
 
   const removed = expectOk(runCli(["remove", "-y"], project, home));
   assert.match(removed, /Claude Code: removed/);
