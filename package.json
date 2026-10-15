@@ -51,11 +51,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/StackGuardian/add-sg-mcp.git"
+    "url": "git+https://github.com/StackGuardian/stackguardian-mcp.git"
   },
-  "homepage": "https://github.com/StackGuardian/add-sg-mcp#readme",
+  "homepage": "https://github.com/StackGuardian/stackguardian-mcp#readme",
   "bugs": {
-    "url": "https://github.com/StackGuardian/add-sg-mcp/issues"
+    "url": "https://github.com/StackGuardian/stackguardian-mcp/issues",
+    "email": "support@stackguardian.io"
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",

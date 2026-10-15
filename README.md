@@ -1,22 +1,55 @@
-# StackGuardian MCP
+# Deploy Terraform, OpenTofu and Ansible with your AI coding agent
 
-Work with [StackGuardian](https://www.stackguardian.io) from your coding agent. One command adds the **StackGuardian MCP server** to Claude Code, Codex, Cursor, VS Code, Gemini CLI and [more](#supported-agents), and installs the **StackGuardian skills**. You can then ask your agent, in plain language, to find out why a run failed, deploy a template, change a workflow or check your cloud posture.
+One-command MCP setup and ready-to-use agent skills for Claude Code, Cursor, Codex and [more](#supported-agents).
+
+Connect your coding agent to [StackGuardian](https://www.stackguardian.io), the platform that runs and governs your infrastructure deployments. Then ask in plain language to turn your existing infrastructure code into deployment workflows, review changes, require approvals, add policies and find out why a run failed.
 
 ```bash
 npx add-sg-mcp
 ```
 
-No Node.js? Use the [one-line installer](#install) for macOS, Linux or Windows instead.
+No Node.js? Use the [one-line installer](#install) for macOS, Linux or Windows.
 
-## Before you start
+**Then try asking your agent:**
 
-- A StackGuardian account with access to the organization you want to connect.
-- Your region: **Europe** (`app.stackguardian.io`) or **United States** (`us.stackguardian.io`).
+> Deploy the Terraform in my `infra` repository, folder `envs/dev`, to AWS.
+
+> Create an OpenTofu workflow for this repository that waits for my approval before every apply.
+
+> Find out why my last infrastructure deployment failed.
+
+[Get started](#get-started) · [Supported agents](#supported-agents) · [Skills](#mcp-and-skills) · [Skills guide](skills/README.md)
+
+## What you can do
+
+| Goal                           | Ask your agent, for example                                                                          | What happens                                                                                                                                                                     |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deploy Terraform               | "Create a workflow for the Terraform in `github.com/acme/infra`, folder `envs/staging`."             | A Terraform workflow that runs your own repository's code. The agent asks for the branch, the cloud connector and any variables.                                                 |
+| Deploy OpenTofu                | "Create an OpenTofu workflow from our repo that needs approval before every apply."                  | The same, with OpenTofu as the engine.                                                                                                                                           |
+| Run Ansible playbooks          | "Set up a workflow that runs our Ansible playbook as a custom step."                                 | A custom step pipeline built from workflow step templates in your StackGuardian library. Helm, Kubernetes manifests and CloudFormation work the same way.                        |
+| Start from a template          | "Deploy the S3 bucket template from our library into the `dev` workflow group."                      | A workflow from a library template. You see every input and its default before anything is created.                                                                              |
+| Deploy related pieces together | "Create a stack that sets up a VPC, a security group and an EC2 instance in `staging`."              | Several workflows from a stack template, run in the order the template sets.                                                                                                     |
+| Govern deployments             | "Block any deployment in the `prod` group that makes an S3 bucket public."                           | A policy that blocks, warns on or requires approval for a change, written in [Tirith](https://github.com/StackGuardian/tirith) or Rego, or taken from a library policy template. |
+| Approve or stop runs           | "Approve the run of `prod-vpc` that's waiting for approval."                                         | The agent always asks you before it approves, rejects or cancels a run.                                                                                                          |
+| Troubleshoot                   | "Why did the last run of `prod-vpc` fail?" · "Show the outputs of that run."                         | The agent reads the run's status, logs and outputs.                                                                                                                              |
+| Manage what you deployed       | "Add a nightly 2 AM schedule to `prod-vpc`." · "Upgrade `prod-vpc` to the latest template revision." | Changes only the settings you name, or moves the workflow to another template revision after a dry run.                                                                          |
+| Keep secrets out of code       | "Store a GitHub token as a secret called `GITHUB_TOKEN`."                                            | The value goes into the StackGuardian vault, and workflows refer to it by name.                                                                                                  |
+| Check your cloud               | "How are we doing on cloud posture?" · "What isn't managed by IaC?"                                  | The agent reads your cloud inventory and posture data.                                                                                                                           |
+
+**Creating a workflow doesn't deploy anything.** A deployment happens when a run starts: when you or your agent start a plan or apply, or when a schedule you set fires. Most agents ask you to approve each tool call, so you see a run request before it starts.
+
+## Get started
+
+### Before you start
+
+- **A StackGuardian account** with access to the organization you want to connect, and roles that let you create and run workflows. Your region is **Europe** (`app.stackguardian.io`) or **United States** (`us.stackguardian.io`).
+- **Connectors** for what you deploy: a cloud connector for the account you deploy to (AWS, for example), and a git (VCS) connector if your infrastructure code is in a private repository. The agent lists the connectors your organization already has.
 - At least one [supported coding agent](#supported-agents) on this machine.
+- Node.js 18 or later for `npx`, or the standalone executable below.
 
-## Install
+### Install
 
-With Node.js 18 or later:
+With Node.js:
 
 ```bash
 npx add-sg-mcp
@@ -36,13 +69,14 @@ irm https://dl.stackguardian.io/add-sg-mcp/install.ps1 | iex
 
 Then:
 
-1. Pick your region. The StackGuardian dashboard opens in your browser; sign in if needed, then choose the organization, the roles the agent may use and how long the access lasts.
-2. Back in the terminal, choose the agents to connect. The ones found on this machine (or those you picked last time) are preselected.
-3. Restart those agents.
+1. **Sign in.** Pick your region. The StackGuardian dashboard opens in your browser; sign in if needed, then choose the organization, the roles the agent may use and how long the access lasts.
+2. **Connect your agents.** Back in the terminal, choose the agents to connect. The ones found on this machine (or those you picked last time) are preselected.
+3. **Restart those agents.** Most read their MCP configuration only at startup.
+4. **Ask.** Describe what you want to deploy, change or investigate. The agent looks up your workflow groups, templates and connectors, and checks with you before it creates or changes anything.
 
 With the standalone executable, run `add-sg-mcp` wherever this README says `npx add-sg-mcp`. See [Install script options](#install-script-options) to pin a version, change the install folder or use a mirror.
 
-## Check that it works
+### Check that it works
 
 - **Claude Code:** run `/mcp`. `StackGuardian-<org>` should be listed, and the skills show up as `/sg-create-workflow`, `/sg-update-workflow`, `/sg-upgrade-workflow`, `/sg-create-stack`, `/sg-create-policy` and `/sg-manage-secrets`.
 - **Any agent:** `npx add-sg-mcp status` shows your saved sign-in and which agents have the server and the skills.
@@ -50,35 +84,43 @@ With the standalone executable, run `add-sg-mcp` wherever this README says `npx 
 
 Nothing there? See [Troubleshooting](#troubleshooting).
 
-## What your agent can do
+## Supported agents
 
-The MCP server works in the organization you connected, with the access of the credential you chose ([see below](#choose-how-your-agent-signs-in)). Its tools cover these areas:
+**Claude Code, Cursor, Codex, VS Code (Copilot), Gemini CLI, OpenCode, Windsurf**, plus GitHub Copilot CLI, Kiro CLI, Zed, Cline, Goose, Grok Build, Kilo Code, Kimi Code, Antigravity, Pi, Mastra Code and MCPorter. Run `npx add-sg-mcp list-agents` for the current list and each agent's config file.
 
-| Area                        | Ask your agent, for example                                                                                                          |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Workflows and runs          | "Why did the last run of `prod-vpc` fail?" · "Show the outputs of that run" · "Start a new run of `prod-vpc`"                        |
-| Approvals                   | "Approve the run of `prod-vpc` that's waiting for approval" — the agent always asks you before it approves, rejects or cancels a run |
-| Templates and the library   | "Find a StackGuardian template for an S3 bucket" · "Which workflows still use revision 3 of our `vpc` template?"                     |
-| Stacks and policies         | "Which stacks have drift?" · "Which stacks have no policy attached?"                                                                 |
-| Secrets and connectors      | "Is our AWS connector still authenticating?" · "Store a new secret `github-token`"                                                   |
-| Cloud inventory and posture | "How are we doing on cloud posture?" · "What are our ten most misconfigured AWS resources?" · "What isn't managed by IaC?"           |
+Every agent gets the MCP server. Skills are installed into each agent's skills directory where the agent has one; Mastra Code and MCPorter get the server only. How a skill starts differs by agent: Claude Code offers each one as a slash command, and other agents pick up a skill when your request matches it. See [Agent-specific notes](#agent-specific-notes) for other differences.
 
-Tools that create, change, run or delete things act on your real StackGuardian organization. Most agents ask before each tool call, so read what the agent is about to do before you approve it. In Claude Code, `/mcp` lists the server's current tools.
+## MCP and skills
 
-### Skills
+**MCP provides the tools. Skills provide the playbooks.**
 
-The skills walk the agent through multi-step changes and ask you at each decision instead of guessing:
+- **The StackGuardian MCP server** gives your agent tools for your StackGuardian organization: search workflows, read run logs, create a workflow, start a run, store a secret and more. The server is hosted by StackGuardian; this repository contains the installer that connects your agents to it. In Claude Code, `/mcp` lists the server's current tools.
+- **The skills** are playbooks for multi-step tasks, bundled in [`skills/`](skills/). Each one tells the agent which tools to use, in what order, and what to ask you along the way, so it brings you choices instead of guessing IDs or defaults.
 
-| Skill                 | Use it to                                                                                                                                                                                  | Try saying                                                                              |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| `sg-create-workflow`  | Create a workflow from a StackGuardian template or your own git repository (Terraform, OpenTofu or a custom step pipeline). You review the template's defaults before anything is created. | "Deploy the S3 bucket template from the library into the `dev` workflow group."         |
-| `sg-update-workflow`  | Change an existing workflow's settings: connector, environment variables, schedules, approvals, runners, notifications and more. Only what you change is touched.                          | "Add a nightly 2 AM schedule to `prod-vpc`."                                            |
-| `sg-upgrade-workflow` | Move a workflow to another template revision, with a dry run that shows the exact change first.                                                                                            | "Upgrade `prod-vpc` to the latest revision of its template."                            |
-| `sg-create-stack`     | Create a stack: several workflows deployed together from a stack template, in a set order. You review each workflow's inputs. Nothing runs until you start it.                             | "Create a stack that sets up a VPC, a security group and an EC2 instance in `staging`." |
-| `sg-create-policy`    | Add a guardrail that blocks, warns on, or requires approval for infrastructure changes, using a library policy, a Tirith rule or your own Rego.                                            | "Block any deployment in the `prod` group that makes an S3 bucket public."              |
-| `sg-manage-secrets`   | Store, rotate or delete vault secrets, and use them in workflows.                                                                                                                          | "Store a GitHub token as a secret called `GITHUB_TOKEN`."                               |
+| Skill                                                        | Use it to                                                                                                                                                                                | Try saying                                                                                              |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| [`sg-create-workflow`](skills/sg-create-workflow/SKILL.md)   | Create a workflow from your own git repository or a library template: Terraform, OpenTofu or a custom step pipeline (Ansible, Helm and so on). You review the inputs and defaults first. | "Create a workflow for the Terraform in `github.com/acme/infra`, folder `envs/staging`, branch `main`." |
+| [`sg-update-workflow`](skills/sg-update-workflow/SKILL.md)   | Change an existing workflow's connector, variables, schedules, approvals, runner, notifications, sizing and more. Only what you change is touched.                                       | "Require approval from alice@example.com or bob@example.com before `prod-vpc` applies."                 |
+| [`sg-upgrade-workflow`](skills/sg-upgrade-workflow/SKILL.md) | Move a workflow to another template revision, with a dry run that shows the exact change first.                                                                                          | "What would change if I moved `prod-vpc` to revision 5 of its template?"                                |
+| [`sg-create-stack`](skills/sg-create-stack/SKILL.md)         | Create several workflows together from a stack template, reviewing each workflow's inputs. Nothing runs until you start it.                                                              | "Create a stack that sets up a VPC, a security group and an EC2 instance in `staging`."                 |
+| [`sg-create-policy`](skills/sg-create-policy/SKILL.md)       | Add a guardrail that blocks, warns on or requires approval for infrastructure changes, from a library policy, a Tirith rule or your own Rego.                                            | "Warn when the estimated monthly cost of an EC2 instance goes over $100."                               |
+| [`sg-manage-secrets`](skills/sg-manage-secrets/SKILL.md)     | Store, rotate or delete vault secrets, and use them in workflows.                                                                                                                        | "Store this API token and add it to `prod-vpc` as the `API_TOKEN` environment variable."                |
 
-In Claude Code, start one with `/sg-create-workflow` and so on. Other agents pick up a skill when your request matches it. For step-by-step walkthroughs and more examples, see [skills/README.md](skills/README.md).
+The [skills guide](skills/README.md) walks through each skill step by step, with more examples and the StackGuardian terms you'll meet.
+
+## Why run deployments through StackGuardian?
+
+Terraform, OpenTofu and Ansible still do the work. Running them as StackGuardian workflows instead of from your laptop adds the parts a team needs around them:
+
+- **Managed execution.** Runs happen on StackGuardian-managed runners or on your own private runner group, not on the machine your agent runs on.
+- **Run history.** Every plan and apply is recorded with its logs and outputs, so you, your teammates and your agent can look back at what happened.
+- **Reviews and approvals.** A Terraform or OpenTofu workflow can pause after the plan until named approvers release it; a custom pipeline can pause before any step.
+- **Policies.** Tirith or Rego rules check infrastructure changes and block them, warn or ask for approval.
+- **Reusable templates.** Library templates and stack templates give teams a reviewed starting point, with revisions you can upgrade to.
+- **After the deploy.** Schedules, drift detection for Terraform and OpenTofu workflows, notifications, webhooks and chained workflows.
+- **Secrets and connectors.** Workflows use cloud and git connectors and vault secrets by reference, so credentials don't have to sit in your repository.
+
+These are per-workflow settings: none is switched on just by connecting your agent, and some apply only to certain workflow types.
 
 ## Choose how your agent signs in
 
@@ -91,6 +133,8 @@ In Claude Code, start one with `/sg-create-workflow` and so on. Other agents pic
 | Expiry and revoking | You choose the expiry; revoke from _Profile → Connected apps_ | No expiry; rotate it from _Profile → API keys_                   | Handled through the agent's own sign-in                     |
 
 Only the grant sign-in opens the dashboard. An API key is never fetched for you: pass it with `--token` (or `SG_API_KEY`). Without `--auth`, a key you pass, or one saved by an earlier `--token` run, selects the API key; otherwise you sign in for a grant.
+
+The tools that create, change, run or delete things act on your real StackGuardian organization, with the access of the credential you chose. Read what the agent is about to do before you approve a tool call.
 
 ### Grant tokens
 
@@ -206,20 +250,20 @@ Environment variables (with `curl | sh`, set them on the `sh` side: `… | ADD_S
 | `ADD_SG_MCP_DOWNLOAD_URL` | Base URL of a mirror that serves the release files                                                                        |
 | `ADD_SG_MCP_NO_RUN`       | `1` installs without running `add-sg-mcp`                                                                                 |
 
-Builds exist for macOS (Apple Silicon, Intel), Linux with glibc (x64, arm64) and Windows x64. To install by hand, download `https://dl.stackguardian.io/add-sg-mcp/v<version>/add-sg-mcp-<os>-<arch>.tar.gz` (or `add-sg-mcp-windows-x64.zip`) and put the executable on your `PATH`; `https://dl.stackguardian.io/add-sg-mcp/latest` names the newest version, and `SHA256SUMS` sits next to the archives. `gh attestation verify <file> --repo StackGuardian/add-sg-mcp` confirms that a file was built by this repository's workflow.
+Builds exist for macOS (Apple Silicon, Intel), Linux with glibc (x64, arm64) and Windows x64. To install by hand, download `https://dl.stackguardian.io/add-sg-mcp/v<version>/add-sg-mcp-<os>-<arch>.tar.gz` (or `add-sg-mcp-windows-x64.zip`) and put the executable on your `PATH`; `https://dl.stackguardian.io/add-sg-mcp/latest` names the newest version, and `SHA256SUMS` sits next to the archives.
+
+`gh attestation verify <file> --repo StackGuardian/stackguardian-mcp` confirms that a file was built by this repository's workflow. Releases up to and including 1.0.6 were built before the repository was renamed from `add-sg-mcp`; verify those with `--repo StackGuardian/add-sg-mcp`.
 
 `dl.stackguardian.io` has every release from 1.0.4 on.
 
 The executables are not yet notarized by Apple or code-signed for Windows. The install scripts are not affected, but a browser download is quarantined on macOS and may show a SmartScreen prompt on Windows (_More info → Run anyway_).
 
-### Supported agents
-
-Claude Code, Codex, Cursor, VS Code (Copilot), Gemini CLI, OpenCode, GitHub Copilot CLI, Windsurf, Kiro CLI, Zed, Cline, Goose, Grok Build, Kilo Code, Kimi Code, Antigravity, Pi, Mastra Code, MCPorter. Run `npx add-sg-mcp list-agents` for the current list and each agent's config file.
+### Agent-specific notes
 
 - **Codex** and **Grok Build** store MCP servers in a TOML file that is rewritten as a whole; comments in `~/.codex/config.toml` are not preserved.
 - **Claude Desktop** and **fx** are skipped: Claude Desktop only supports local (stdio) servers here and fx only sends bearer tokens. Add StackGuardian to Claude Desktop through _Settings → Connectors_ instead.
 - **Claude Code** and **GitHub Copilot CLI** share `.mcp.json` in project scope.
-- Mastra Code and MCPorter get the server but have no skills directory.
+- **Mastra Code** and **MCPorter** get the server but have no skills directory.
 
 ### How it works
 
@@ -255,6 +299,8 @@ Claude Code, Codex, Cursor, VS Code (Copilot), Gemini CLI, OpenCode, GitHub Copi
 
 ## Contributing
 
+Pull requests are welcome: fixes to the installer, support for more agents, and improvements to the skills in [`skills/`](skills/). For a problem with your StackGuardian account or the hosted MCP server, contact support@stackguardian.io.
+
 ```bash
 bun install
 bun run dev -- --help          # run from source
@@ -262,10 +308,12 @@ bun run typecheck && bun run test
 bun run build:binary           # standalone executable for this machine
 ```
 
-Tests are plain `tsx` scripts with `node:assert` (no mocks; the login test spins up a real loopback server), run by `tests/run.mjs` under a throwaway `HOME`. See `AGENTS.md` for the workflow, `docs/RELEASING.md` for releases and `docs/superpowers/specs/` for the design.
+Tests are plain `tsx` scripts with `node:assert` (no mocks; the login test spins up a real loopback server), run by `tests/run.mjs` under a throwaway `HOME`. See [`AGENTS.md`](AGENTS.md) for the workflow, [`docs/RELEASING.md`](docs/RELEASING.md) for releases and [`docs/superpowers/specs/`](docs/superpowers/specs/) for the design.
+
+If this project is useful to you, starring the repository helps other developers find it.
 
 This project is a fork of [neon-solutions/add-mcp](https://github.com/neon-solutions/add-mcp) (Apache-2.0); the agent config writers come from upstream unchanged. Passing a URL or package name as the first argument still installs any other MCP server the way `add-mcp` does.
 
 ## License
 
-Apache-2.0. See `LICENSE` and `NOTICE`.
+Apache-2.0. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
