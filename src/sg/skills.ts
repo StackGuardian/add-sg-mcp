@@ -21,6 +21,9 @@ export const SG_SKILL_NAMES = [
   "sg-create-workflow",
   "sg-update-workflow",
   "sg-upgrade-workflow",
+  "sg-create-stack",
+  "sg-create-policy",
+  "sg-manage-secrets",
 ] as const;
 export type SgSkillName = (typeof SG_SKILL_NAMES)[number];
 

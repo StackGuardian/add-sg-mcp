@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.0
+
+- Three more skills are installed with the server: `sg-create-stack` creates a stack (several workflows deployed together from a stack template) and walks you through each workflow's inputs; `sg-create-policy` adds a guardrail that blocks, warns on, or requires approval for infrastructure changes; `sg-manage-secrets` stores, rotates and deletes vault secrets and wires them into workflows. Run `npx add-sg-mcp@latest` (or the install script) again to get them. Before, only the three workflow skills were installed.
+- `skills/README.md` explains each skill with example requests and the steps the agent takes you through.
+
 ## 1.0.6
 
 - `add-sg-mcp login` carries on after you sign in: it asks which coding agents should get the server, then installs the server and the skills, the same as `add-sg-mcp`. Before, it stopped at "Run add-sg-mcp to install the server and skills" and you had to run a second command. Without a terminal (CI, a pipe) `login` still only saves the credential.
