@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.7
+
+- The agent picker shows its keys the whole time: space to select or unselect, enter to continue. Before, they only appeared after you pressed enter with nothing selected.
+- The closing "Next steps" note suggests a few prompts to try in your agent, such as summarizing your security posture or finding out why a workflow run failed.
+
 ## 1.0.6
 
 - `add-sg-mcp login` carries on after you sign in: it asks which coding agents should get the server, then installs the server and the skills, the same as `add-sg-mcp`. Before, it stopped at "Run add-sg-mcp to install the server and skills" and you had to run a second command. Without a terminal (CI, a pipe) `login` still only saves the credential.

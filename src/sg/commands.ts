@@ -430,7 +430,8 @@ async function chooseAgents(
     lastSelected,
   });
   const selected = await p.multiselect({
-    message: "Which coding agents should get the StackGuardian server?",
+    // clack shows the keys only after an empty submit; keep them on screen.
+    message: `Which coding agents should get the StackGuardian server?\n${chalk.gray("│")}  ${chalk.dim("space to select/unselect · enter to continue")}`,
     options: choices,
     required: true,
     initialValues: initialValues.length > 0 ? initialValues : detected,
@@ -580,6 +581,13 @@ export async function runConnect(
   await installServerAndSkills(target, options, deps);
 }
 
+const SUGGESTED_PROMPTS = [
+  "Summarize my StackGuardian security posture and top misconfigurations",
+  "Why did my latest workflow run fail? Show me the logs",
+  "Create a workflow from a marketplace template for an S3 bucket",
+  "Upgrade my workflows that use an outdated template version",
+];
+
 /** Agent pick, server entry, skills and the closing note: everything after the credential. */
 async function installServerAndSkills(
   { apiBase, org, headers, allowed }: SgInstallTarget,
@@ -617,6 +625,9 @@ async function installServerAndSkills(
       `Restart your agents to pick up ${chalk.cyan(outcome.serverName)}.`,
       `Claude Code: ${chalk.cyan("/mcp")} lists the server; the skills appear as ${SG_SKILL_NAMES.map((s) => chalk.cyan(`/${s}`)).join(", ")}.`,
       `Check anytime with ${chalk.cyan("add-sg-mcp status")}; remove with ${chalk.cyan("add-sg-mcp remove")}.`,
+      "",
+      "Try asking your agent:",
+      ...SUGGESTED_PROMPTS.map((prompt) => `  ${chalk.cyan(`"${prompt}"`)}`),
     ].join("\n"),
     "Next steps",
   );
