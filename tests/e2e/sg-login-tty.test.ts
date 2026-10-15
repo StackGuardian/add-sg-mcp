@@ -151,8 +151,10 @@ await test("login in a terminal goes on to pick agents and install", async () =>
 
   assert.strictEqual(result.status, 0, result.output);
   assert.match(result.output, /Saved credentials for demo-org/);
+  assert.match(result.output, /space to select\/unselect · enter to continue/);
   assert.match(result.output, /Skills \(user scope\)/);
   assert.match(result.output, /Next steps/);
+  assert.match(result.output, /Try asking your agent/);
   assert.doesNotMatch(result.output, /to install the server and skills/);
 
   const claude = JSON.parse(
