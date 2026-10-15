@@ -1,4 +1,4 @@
-# add-sg-mcp
+# StackGuardian MCP
 
 Work with [StackGuardian](https://www.stackguardian.io) from your coding agent. One command adds the **StackGuardian MCP server** to Claude Code, Codex, Cursor, VS Code, Gemini CLI and [more](#supported-agents), and installs the **StackGuardian skills**. You can then ask your agent, in plain language, to find out why a run failed, deploy a template, change a workflow or check your cloud posture.
 
