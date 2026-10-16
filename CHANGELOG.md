@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0
+
+- The npm package is now `@stackguardian/mcp-wizard`: run `npx @stackguardian/mcp-wizard`. `add-sg-mcp` stops at 1.1.0. Your saved sign-in and installed skills carry over, so there is nothing to redo. The standalone executable and the install scripts keep the `add-sg-mcp` name.
+- The hints the tool prints, such as "Run … login to switch", show the command you used: `npx @stackguardian/mcp-wizard …` from npm, `add-sg-mcp …` from the standalone executable. Before, they always said `add-sg-mcp`, which is not on your `PATH` when you run it through npx.
+
 ## 1.1.0
 
 - Three more skills are installed with the server: `sg-create-stack` creates a stack (several workflows deployed together from a stack template) and walks you through each workflow's inputs; `sg-create-policy` adds a guardrail that blocks, warns on, or requires approval for infrastructure changes; `sg-manage-secrets` stores, rotates and deletes vault secrets and wires them into workflows. Run `npx add-sg-mcp@latest` (or the install script) again to get them. Before, only the three workflow skills were installed.

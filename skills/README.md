@@ -1,6 +1,6 @@
 # StackGuardian skills
 
-`add-sg-mcp` installs six skills next to the StackGuardian MCP server. A skill teaches your coding agent how to carry out a StackGuardian task step by step. With a skill, the agent looks up your workflow groups, templates and connectors instead of guessing. It shows you the values it is about to use, and it confirms a summary with you before it creates or changes anything.
+`@stackguardian/mcp-wizard` installs six skills next to the StackGuardian MCP server. A skill teaches your coding agent how to carry out a StackGuardian task step by step. With a skill, the agent looks up your workflow groups, templates and connectors instead of guessing. It shows you the values it is about to use, and it confirms a summary with you before it creates or changes anything.
 
 - [How the pieces fit](#how-the-pieces-fit)
 - [StackGuardian terms you'll see](#stackguardian-terms-youll-see)
@@ -22,7 +22,7 @@
 - **A skill** is a playbook for one task. It tells the agent which tools to use, in what order, and what to ask you along the way.
 - **You** make the decisions. The agent brings you the options and you pick.
 
-Not set up yet? Run `npx add-sg-mcp` and follow the [README](../README.md#install). It installs the server and all six skills. Then restart your agent.
+Not set up yet? Run `npx @stackguardian/mcp-wizard` and follow the [README](../README.md#install). It installs the server and all six skills. Then restart your agent.
 
 ## StackGuardian terms you'll see
 
@@ -247,10 +247,10 @@ These skills use the StackGuardian MCP server and act on your StackGuardian orga
 
 ## Updating and removing the skills
 
-- **Update:** run `npx add-sg-mcp@latest`, or the install script again. Each run refreshes the skills.
-- **Check:** `npx add-sg-mcp status` shows which agents have the skills.
-- **Skip:** `npx add-sg-mcp --skip-skills` installs the server without them.
-- **Remove:** `npx add-sg-mcp remove` takes the server and the skills out of your agents.
+- **Update:** run `npx @stackguardian/mcp-wizard@latest`, or the install script again. Each run refreshes the skills.
+- **Check:** `npx @stackguardian/mcp-wizard status` shows which agents have the skills.
+- **Skip:** `npx @stackguardian/mcp-wizard --skip-skills` installs the server without them.
+- **Remove:** `npx @stackguardian/mcp-wizard remove` takes the server and the skills out of your agents.
 
 The skills are copied to `~/.agents/skills/` and linked into each agent's own skills folder (`~/.claude/skills`, `~/.codex/skills`, `~/.cursor/skills`, …). Mastra Code and MCPorter have no skills support, so they get the server only.
 

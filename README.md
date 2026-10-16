@@ -3,7 +3,7 @@
 Work with [StackGuardian](https://www.stackguardian.io) from your coding agent. One command adds the **StackGuardian MCP server** to Claude Code, Codex, Cursor, VS Code, Gemini CLI and [more](#supported-agents), and installs the **StackGuardian skills**. You can then ask your agent, in plain language, to find out why a run failed, deploy a template, change a workflow or check your cloud posture.
 
 ```bash
-npx add-sg-mcp
+npx @stackguardian/mcp-wizard
 ```
 
 No Node.js? Use the [one-line installer](#install) for macOS, Linux or Windows instead.
@@ -19,7 +19,7 @@ No Node.js? Use the [one-line installer](#install) for macOS, Linux or Windows i
 With Node.js 18 or later:
 
 ```bash
-npx add-sg-mcp
+npx @stackguardian/mcp-wizard
 ```
 
 Without Node.js, the installer downloads a standalone executable, checks it against the release's `SHA256SUMS`, installs it and runs it:
@@ -40,12 +40,12 @@ Then:
 2. Back in the terminal, choose the agents to connect. The ones found on this machine (or those you picked last time) are preselected.
 3. Restart those agents.
 
-With the standalone executable, run `add-sg-mcp` wherever this README says `npx add-sg-mcp`. See [Install script options](#install-script-options) to pin a version, change the install folder or use a mirror.
+With the standalone executable, run `add-sg-mcp` wherever this README says `npx @stackguardian/mcp-wizard`. See [Install script options](#install-script-options) to pin a version, change the install folder or use a mirror.
 
 ## Check that it works
 
 - **Claude Code:** run `/mcp`. `StackGuardian-<org>` should be listed, and the skills show up as `/sg-create-workflow`, `/sg-update-workflow`, `/sg-upgrade-workflow`, `/sg-create-stack`, `/sg-create-policy` and `/sg-manage-secrets`.
-- **Any agent:** `npx add-sg-mcp status` shows your saved sign-in and which agents have the server and the skills.
+- **Any agent:** `npx @stackguardian/mcp-wizard status` shows your saved sign-in and which agents have the server and the skills.
 - Ask your agent something small, such as _"Show my five most recent StackGuardian workflow runs and their status."_
 
 Nothing there? See [Troubleshooting](#troubleshooting).
@@ -82,56 +82,56 @@ In Claude Code, start one with `/sg-create-workflow` and so on. Other agents pic
 
 ## Choose how your agent signs in
 
-|                     | Grant token (default)                                         | API key                                                          | OAuth (preview)                                             |
-| ------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- |
-| Command             | `npx add-sg-mcp`                                              | `npx add-sg-mcp --token <api-key> --org <org> --region <eu\|us>` | `npx add-sg-mcp --auth oauth --org <org> --region <eu\|us>` |
-| How you sign in     | In the browser                                                | No browser: you pass a key from _Profile → API keys_             | In the agent, on first use                                  |
-| What the agent gets | A token for one organization and the roles you approve        | Your user API key for the organization                           | No stored credential; the agent signs you in on first use   |
-| Access              | Only the roles you approved                                   | Everything your roles allow                                      | Your access, through the agent's own sign-in                |
-| Expiry and revoking | You choose the expiry; revoke from _Profile → Connected apps_ | No expiry; rotate it from _Profile → API keys_                   | Handled through the agent's own sign-in                     |
+|                     | Grant token (default)                                         | API key                                                                         | OAuth (preview)                                                            |
+| ------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Command             | `npx @stackguardian/mcp-wizard`                               | `npx @stackguardian/mcp-wizard --token <api-key> --org <org> --region <eu\|us>` | `npx @stackguardian/mcp-wizard --auth oauth --org <org> --region <eu\|us>` |
+| How you sign in     | In the browser                                                | No browser: you pass a key from _Profile → API keys_                            | In the agent, on first use                                                 |
+| What the agent gets | A token for one organization and the roles you approve        | Your user API key for the organization                                          | No stored credential; the agent signs you in on first use                  |
+| Access              | Only the roles you approved                                   | Everything your roles allow                                                     | Your access, through the agent's own sign-in                               |
+| Expiry and revoking | You choose the expiry; revoke from _Profile → Connected apps_ | No expiry; rotate it from _Profile → API keys_                                  | Handled through the agent's own sign-in                                    |
 
 Only the grant sign-in opens the dashboard. An API key is never fetched for you: pass it with `--token` (or `SG_API_KEY`). Without `--auth`, a key you pass, or one saved by an earlier `--token` run, selects the API key; otherwise you sign in for a grant.
 
 ### Grant tokens
 
-`npx add-sg-mcp` (optionally `--region eu --org my-org`) asks the StackGuardian OAuth broker for a **grant token** instead of using your API key. The browser opens a consent page where you pick the organization, the roles the agent may use and how long the grant should last; the CLI receives an `sgat_` token on a loopback callback and writes it to each agent as an `Authorization: Bearer` header.
+`npx @stackguardian/mcp-wizard` (optionally `--region eu --org my-org`) asks the StackGuardian OAuth broker for a **grant token** instead of using your API key. The browser opens a consent page where you pick the organization, the roles the agent may use and how long the grant should last; the CLI receives an `sgat_` token on a loopback callback and writes it to each agent as an `Authorization: Bearer` header.
 
 - The token is bound to **one organization and the roles you approved** — it is not your full user key, so an agent can be given less than you have.
-- `npx add-sg-mcp status` shows `expires <date>`, `no expiry` or `expired`. An expired grant is never reused; the next run asks for a new one.
+- `npx @stackguardian/mcp-wizard status` shows `expires <date>`, `no expiry` or `expired`. An expired grant is never reused; the next run asks for a new one.
 - `logout` revokes the saved grant and deletes the local copy. Revoke a grant any time from _Profile → Connected apps_ in the dashboard.
-- `npx add-sg-mcp login` requests a fresh grant, then asks which agents to install it to.
-- If an API key is saved from an earlier `--token` run, `npx add-sg-mcp` keeps using it. Pass `--auth grant` to switch to a grant.
+- `npx @stackguardian/mcp-wizard login` requests a fresh grant, then asks which agents to install it to.
+- If an API key is saved from an earlier `--token` run, `npx @stackguardian/mcp-wizard` keeps using it. Pass `--auth grant` to switch to a grant.
 
 ### OAuth (preview)
 
-`npx add-sg-mcp --auth oauth --org my-org --region eu` writes the server URL without a credential for agents that implement MCP OAuth themselves (Claude Code, VS Code, Cursor, Codex, Gemini CLI, Windsurf). The agent then signs you in on first use. This needs the StackGuardian OAuth broker to be enabled for your environment.
+`npx @stackguardian/mcp-wizard --auth oauth --org my-org --region eu` writes the server URL without a credential for agents that implement MCP OAuth themselves (Claude Code, VS Code, Cursor, Codex, Gemini CLI, Windsurf). The agent then signs you in on first use. This needs the StackGuardian OAuth broker to be enabled for your environment.
 
 ## Everyday tasks
 
-| To                             | Run                                                                                                                                                                                                                     |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Connect another agent          | `npx add-sg-mcp -a cursor` (`npx add-sg-mcp list-agents` shows the names)                                                                                                                                               |
-| Connect another organization   | `npx add-sg-mcp login --org other-org --region eu`, then pick your agents. It gets its own `StackGuardian-other-org` entry next to the first.                                                                           |
-| Disconnect one organization    | `npx add-sg-mcp remove --name StackGuardian-<org>`. The skills stay for the organizations you keep.                                                                                                                     |
-| Update the tool and the skills | `npx add-sg-mcp@latest`, or run the install script again. Each run refreshes the skills.                                                                                                                                |
-| See what's installed           | `npx add-sg-mcp status`                                                                                                                                                                                                 |
-| Remove everything              | `npx add-sg-mcp logout --purge` removes the server and skills from your agents and forgets the credential. For the standalone executable, also delete `~/.local/bin/add-sg-mcp` (Windows: `%LOCALAPPDATA%\add-sg-mcp`). |
+| To                             | Run                                                                                                                                                                                                                                    |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Connect another agent          | `npx @stackguardian/mcp-wizard -a cursor` (`npx @stackguardian/mcp-wizard list-agents` shows the names)                                                                                                                                |
+| Connect another organization   | `npx @stackguardian/mcp-wizard login --org other-org --region eu`, then pick your agents. It gets its own `StackGuardian-other-org` entry next to the first.                                                                           |
+| Disconnect one organization    | `npx @stackguardian/mcp-wizard remove --name StackGuardian-<org>`. The skills stay for the organizations you keep.                                                                                                                     |
+| Update the tool and the skills | `npx @stackguardian/mcp-wizard@latest`, or run the install script again. Each run refreshes the skills.                                                                                                                                |
+| See what's installed           | `npx @stackguardian/mcp-wizard status`                                                                                                                                                                                                 |
+| Remove everything              | `npx @stackguardian/mcp-wizard logout --purge` removes the server and skills from your agents and forgets the credential. For the standalone executable, also delete `~/.local/bin/add-sg-mcp` (Windows: `%LOCALAPPDATA%\add-sg-mcp`). |
 
 ### Headless / CI
 
 Skip the browser with an API key from **Profile → API keys** in the dashboard:
 
 ```bash
-npx add-sg-mcp --token sgu_… --org my-org --region eu -y --all
+npx @stackguardian/mcp-wizard --token sgu_… --org my-org --region eu -y --all
 # or
-SG_API_KEY=sgu_… SG_ORG=my-org SG_REGION=eu npx add-sg-mcp -y -a claude-code
+SG_API_KEY=sgu_… SG_ORG=my-org SG_REGION=eu npx @stackguardian/mcp-wizard -y -a claude-code
 ```
 
 `--api-base https://…/api/v1` replaces `--region` for non-standard environments. In a Docker image, `curl -fsSL https://dl.stackguardian.io/add-sg-mcp/install.sh | ADD_SG_MCP_NO_RUN=1 sh` installs the executable without running it.
 
 ## Troubleshooting
 
-**The server doesn't show up in my agent.** Restart the agent; most read their MCP config only at startup. Then run `npx add-sg-mcp status`. If the agent isn't listed, it wasn't selected: run `npx add-sg-mcp -a <agent>`. With `--project`, the server is only in that project's config.
+**The server doesn't show up in my agent.** Restart the agent; most read their MCP config only at startup. Then run `npx @stackguardian/mcp-wizard status`. If the agent isn't listed, it wasn't selected: run `npx @stackguardian/mcp-wizard -a <agent>`. With `--project`, the server is only in that project's config.
 
 **"No coding agents detected on this machine."** With `-y`, or when there's no terminal to prompt in, only detected agents are used. Name them instead (`-a claude-code -a cursor`) or pass `--all`.
 
@@ -139,9 +139,9 @@ SG_API_KEY=sgu_… SG_ORG=my-org SG_REGION=eu npx add-sg-mcp -y -a claude-code
 
 **My agent gets "unauthorized" errors.** The credential in the agent's config no longer works:
 
-- API key rotated or deleted: run `npx add-sg-mcp --token <new-key> --org <org> --region <eu|us>` to write the new key to your agents.
-- Grant expired: `npx add-sg-mcp` asks for a new one.
-- Grant revoked: run `npx add-sg-mcp login` and pick your agents.
+- API key rotated or deleted: run `npx @stackguardian/mcp-wizard --token <new-key> --org <org> --region <eu|us>` to write the new key to your agents.
+- Grant expired: `npx @stackguardian/mcp-wizard` asks for a new one.
+- Grant revoked: run `npx @stackguardian/mcp-wizard login` and pick your agents.
 
 **The skills don't appear.** Restart the agent. Mastra Code and MCPorter have no skills support, so they get the server only. `--skip-skills` skips them on purpose.
 
@@ -149,14 +149,14 @@ SG_API_KEY=sgu_… SG_ORG=my-org SG_REGION=eu npx add-sg-mcp -y -a claude-code
 
 **Claude Desktop.** Not supported here: Claude Desktop only takes local servers from this tool. Add StackGuardian through _Settings → Connectors_ instead.
 
-**"this Linux has no glibc".** The standalone executables need glibc, which Alpine and other musl-based systems lack. Use `npx add-sg-mcp` with Node.js there.
+**"this Linux has no glibc".** The standalone executables need glibc, which Alpine and other musl-based systems lack. Use `npx @stackguardian/mcp-wizard` with Node.js there.
 
 ## Reference
 
 ### Options
 
 ```
-npx add-sg-mcp [options]
+npx @stackguardian/mcp-wizard [options]
 
   --region <eu|us|qa>        StackGuardian region (prompted when omitted)
   --org <org>                Organization to connect (pre-selected in the browser)
@@ -175,13 +175,13 @@ npx add-sg-mcp [options]
   --auth <apikey|grant|oauth> Credential mode (default: apikey when a key is given, otherwise grant)
 ```
 
-| Command                                          | What it does                                                                                                                       |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `npx add-sg-mcp login`                           | Sign in again (switch organization or region), then pick the agents to install to. Without a terminal it only saves the credential |
-| `npx add-sg-mcp status`                          | Show the saved credential (masked) and which agents have the server and skills                                                     |
-| `npx add-sg-mcp remove [-a <agent>] [--project]` | Remove the server entry and the skills from your agents                                                                            |
-| `npx add-sg-mcp logout [--purge]`                | Forget the credential; `--purge` also runs `remove`                                                                                |
-| `npx add-sg-mcp list-agents`                     | List supported agents and their config files                                                                                       |
+| Command                                                         | What it does                                                                                                                       |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `npx @stackguardian/mcp-wizard login`                           | Sign in again (switch organization or region), then pick the agents to install to. Without a terminal it only saves the credential |
+| `npx @stackguardian/mcp-wizard status`                          | Show the saved credential (masked) and which agents have the server and skills                                                     |
+| `npx @stackguardian/mcp-wizard remove [-a <agent>] [--project]` | Remove the server entry and the skills from your agents                                                                            |
+| `npx @stackguardian/mcp-wizard logout [--purge]`                | Forget the credential; `--purge` also runs `remove`                                                                                |
+| `npx @stackguardian/mcp-wizard list-agents`                     | List supported agents and their config files                                                                                       |
 
 `remove` and `logout --purge` take every `StackGuardian-<org>` entry and the skills out. `remove --name <entry>` takes out just that entry and keeps the skills.
 
@@ -214,7 +214,7 @@ The executables are not yet notarized by Apple or code-signed for Windows. The i
 
 ### Supported agents
 
-Claude Code, Codex, Cursor, VS Code (Copilot), Gemini CLI, OpenCode, GitHub Copilot CLI, Windsurf, Kiro CLI, Zed, Cline, Goose, Grok Build, Kilo Code, Kimi Code, Antigravity, Pi, Mastra Code, MCPorter. Run `npx add-sg-mcp list-agents` for the current list and each agent's config file.
+Claude Code, Codex, Cursor, VS Code (Copilot), Gemini CLI, OpenCode, GitHub Copilot CLI, Windsurf, Kiro CLI, Zed, Cline, Goose, Grok Build, Kilo Code, Kimi Code, Antigravity, Pi, Mastra Code, MCPorter. Run `npx @stackguardian/mcp-wizard list-agents` for the current list and each agent's config file.
 
 - **Codex** and **Grok Build** store MCP servers in a TOML file that is rewritten as a whole; comments in `~/.codex/config.toml` are not preserved.
 - **Claude Desktop** and **fx** are skipped: Claude Desktop only supports local (stdio) servers here and fx only sends bearer tokens. Add StackGuardian to Claude Desktop through _Settings → Connectors_ instead.
@@ -223,7 +223,7 @@ Claude Code, Codex, Cursor, VS Code (Copilot), Gemini CLI, OpenCode, GitHub Copi
 
 ### How it works
 
-1. `npx add-sg-mcp` starts a one-time callback listener on `127.0.0.1` and opens the StackGuardian sign-in for your region in your browser.
+1. `npx @stackguardian/mcp-wizard` starts a one-time callback listener on `127.0.0.1` and opens the StackGuardian sign-in for your region in your browser.
 2. You sign in if needed and choose the organization, the roles the agent may use and how long the grant lasts.
 3. The browser returns a one-time code to the loopback callback, and the CLI exchanges it for a grant token. The token is stored in `~/.config/add-sg-mcp/credentials.json` (mode `0600`). With `--token`, steps 1 to 3 are skipped and the key you passed is stored instead.
 4. The CLI writes the server entry into each selected agent's own config file:

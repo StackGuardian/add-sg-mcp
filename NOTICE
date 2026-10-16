@@ -1,4 +1,4 @@
-add-sg-mcp
+@stackguardian/mcp-wizard
 Copyright 2026 StackGuardian
 
 This product is a fork of add-mcp (https://github.com/neon-solutions/add-mcp),
