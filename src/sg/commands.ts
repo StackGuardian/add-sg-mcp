@@ -15,6 +15,7 @@ import { getLastSelectedAgents, saveSelectedAgents } from "../config.js";
 import { listInstalledServers } from "../reader.js";
 import { removeServer } from "../lib.js";
 import {
+  CLI_COMMAND,
   OAUTH_CAPABLE_AGENTS,
   PRESET_EXCLUDED_AGENTS,
   SG_ENVIRONMENTS,
@@ -255,7 +256,7 @@ async function credentialsFromGrant(
     (!options.org || options.org === saved.org)
   ) {
     p.log.info(
-      `Using the saved grant for ${chalk.cyan(saved.org)} (${saved.dashboardUrl || saved.apiBase}). Run ${chalk.cyan("add-sg-mcp logout")} first to request a new one.`,
+      `Using the saved grant for ${chalk.cyan(saved.org)} (${saved.dashboardUrl || saved.apiBase}). Run ${chalk.cyan(`${CLI_COMMAND} logout`)} first to request a new one.`,
     );
     return saved;
   }
@@ -293,7 +294,7 @@ async function credentialsFromGrant(
     }
     fail(
       error instanceof Error ? error.message : String(error),
-      "Run again, or use an API key instead: add-sg-mcp --token <api-key> --org <org> --region eu|us",
+      `Run again, or use an API key instead: ${CLI_COMMAND} --token <api-key> --org <org> --region eu|us`,
     );
   }
   spinner.stop(
@@ -347,14 +348,14 @@ export async function resolveCredentials(
       (!requestedOrigin || requestedOrigin === saved.dashboardUrl);
     if (orgMatches && envMatches) {
       p.log.info(
-        `Using saved credentials for ${chalk.cyan(saved.org)} (${saved.dashboardUrl || saved.apiBase}). Run ${chalk.cyan("add-sg-mcp login")} to switch.`,
+        `Using saved credentials for ${chalk.cyan(saved.org)} (${saved.dashboardUrl || saved.apiBase}). Run ${chalk.cyan(`${CLI_COMMAND} login`)} to switch.`,
       );
       return saved;
     }
   }
   return fail(
     "API-key mode needs the key: pass --token <api-key> (or SG_API_KEY) with --org and --region.",
-    "To sign in through the browser instead, run add-sg-mcp --auth grant.",
+    `To sign in through the browser instead, run ${CLI_COMMAND} --auth grant.`,
   );
 }
 
@@ -624,7 +625,7 @@ async function installServerAndSkills(
     [
       `Restart your agents to pick up ${chalk.cyan(outcome.serverName)}.`,
       `Claude Code: ${chalk.cyan("/mcp")} lists the server; the skills appear as ${SG_SKILL_NAMES.map((s) => chalk.cyan(`/${s}`)).join(", ")}.`,
-      `Check anytime with ${chalk.cyan("add-sg-mcp status")}; remove with ${chalk.cyan("add-sg-mcp remove")}.`,
+      `Check anytime with ${chalk.cyan(`${CLI_COMMAND} status`)}; remove with ${chalk.cyan(`${CLI_COMMAND} remove`)}.`,
       "",
       "Try asking your agent:",
       ...SUGGESTED_PROMPTS.map((prompt) => `  ${chalk.cyan(`"${prompt}"`)}`),
@@ -658,8 +659,8 @@ export async function runLogin(
   if (!isInteractive()) {
     p.outro(
       grant
-        ? `Grant saved for ${chalk.cyan(credentials.org)}. Run ${chalk.cyan("add-sg-mcp --auth grant")} to install the server and skills.`
-        : `Signed in to ${chalk.cyan(credentials.org)}. Run ${chalk.cyan("add-sg-mcp")} to install the server and skills.`,
+        ? `Grant saved for ${chalk.cyan(credentials.org)}. Run ${chalk.cyan(`${CLI_COMMAND} --auth grant`)} to install the server and skills.`
+        : `Signed in to ${chalk.cyan(credentials.org)}. Run ${chalk.cyan(CLI_COMMAND)} to install the server and skills.`,
     );
     return;
   }
@@ -718,7 +719,7 @@ export async function runStatus(deps: SgCommandDeps): Promise<void> {
       "Credentials",
     );
   } else {
-    p.log.info("Not signed in. Run add-sg-mcp login.");
+    p.log.info(`Not signed in. Run ${CLI_COMMAND} login.`);
   }
 
   const allAgents = getAgentTypes().filter(

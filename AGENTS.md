@@ -1,6 +1,6 @@
-# add-sg-mcp
+# @stackguardian/mcp-wizard
 
-A CLI that connects coding agents (Claude Code, Codex, Cursor, VS Code, Gemini CLI, OpenCode and more) to the StackGuardian MCP server and installs the StackGuardian skills. Fork of `neon-solutions/add-mcp` 2.4.0.
+A CLI (published as `@stackguardian/mcp-wizard`, command `add-sg-mcp`) that connects coding agents (Claude Code, Codex, Cursor, VS Code, Gemini CLI, OpenCode and more) to the StackGuardian MCP server and installs the StackGuardian skills. Fork of `neon-solutions/add-mcp` 2.4.0.
 
 ## Layout
 

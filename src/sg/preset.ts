@@ -3,6 +3,9 @@ import type { SgCredentials } from "./credentials.js";
 
 /** Prefix of the MCP server entry; the organization is appended so several orgs can coexist. */
 export const SG_SERVER_NAME_PREFIX = "StackGuardian";
+/** How the user re-runs this tool: the standalone executable is on PATH, the npm package runs through npx. */
+export const CLI_COMMAND =
+  "Bun" in globalThis ? "add-sg-mcp" : "npx @stackguardian/mcp-wizard";
 /** Entry name written before per-org naming; still recognised by status and remove. */
 export const LEGACY_SG_SERVER_NAME = "stackguardian";
 
